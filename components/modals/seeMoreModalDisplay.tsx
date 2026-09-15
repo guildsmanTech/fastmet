@@ -195,50 +195,52 @@ export default function SeeMoreModalDisplay({
                     </View>
                   </View>
 
-                  <View className="flex-row gap-5">
-                    <Pressable
-                      className="items-center active:scale-110"
-                      hitSlop={20}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/message",
-                          params: {
-                            conversationId: createConversationId(
-                              useAppStore.getState().id!,
-                              data.driver.id,
-                            ),
-                          },
-                        })
-                      }
-                    >
-                      <Ionicons
-                        name="chatbubble-ellipses"
-                        size={Platform.OS === "ios" ? 28 : 24}
-                        color="#F7931E"
-                      />
-                      <Text className="text-sm text-gray-600">Chat</Text>
-                    </Pressable>
-                    <Pressable
-                      className="items-center active:scale-110"
-                      onPress={() => {
-                        const phoneNumber = data.driver.phoneNumber;
-                        if (!phoneNumber) return;
-                        Linking.openURL(`tel:${phoneNumber}`).catch(() => {
-                          Alert.alert(
-                            "Unable to place call",
-                            "Please try again.",
-                          );
-                        });
-                      }}
-                    >
-                      <Ionicons
-                        name="call"
-                        size={Platform.OS === "ios" ? 28 : 24}
-                        color="#F7931E"
-                      />
-                      <Text className="text-sm text-gray-600">Call</Text>
-                    </Pressable>
-                  </View>
+                  {data.status !== "cancelled" && (
+                    <View className="flex-row gap-5">
+                      <Pressable
+                        className="items-center active:scale-110"
+                        hitSlop={20}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/message",
+                            params: {
+                              conversationId: createConversationId(
+                                useAppStore.getState().id!,
+                                data.driver.id,
+                              ),
+                            },
+                          })
+                        }
+                      >
+                        <Ionicons
+                          name="chatbubble-ellipses"
+                          size={Platform.OS === "ios" ? 28 : 24}
+                          color="#F7931E"
+                        />
+                        <Text className="text-sm text-gray-600">Chat</Text>
+                      </Pressable>
+                      <Pressable
+                        className="items-center active:scale-110"
+                        onPress={() => {
+                          const phoneNumber = data.driver.phoneNumber;
+                          if (!phoneNumber) return;
+                          Linking.openURL(`tel:${phoneNumber}`).catch(() => {
+                            Alert.alert(
+                              "Unable to place call",
+                              "Please try again.",
+                            );
+                          });
+                        }}
+                      >
+                        <Ionicons
+                          name="call"
+                          size={Platform.OS === "ios" ? 28 : 24}
+                          color="#F7931E"
+                        />
+                        <Text className="text-sm text-gray-600">Call</Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
               </View>
             )}
@@ -295,8 +297,8 @@ export default function SeeMoreModalDisplay({
               </Text>
               <Text className="mt-1 text-xs leading-5 text-amber-800">
                 Your driver could not continue. We are assigning a replacement
-                automatically. You do not need to do anything, and your price
-                is unchanged.
+                automatically. You do not need to do anything, and your price is
+                unchanged.
               </Text>
             </View>
           )}

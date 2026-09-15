@@ -1,6 +1,6 @@
 import CancelBookingButton from "@/components/CancelBookingButton";
-import useSeeMoreDetails from "@/hooks/useSeeMoreDetails";
 import {useBookingSettings} from "@/hooks/useBookingSettings";
+import useSeeMoreDetails from "@/hooks/useSeeMoreDetails";
 import {useUserBookings} from "@/queries/bookingQueries";
 import {useSocket} from "@/sockets/context/SocketProvider";
 import {useAppStore} from "@/store/useAppStore";
@@ -38,7 +38,7 @@ export default function ActiveRoute() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useUserBookings<ActiveBooking>("active", 5);
+  } = useUserBookings("active", 5);
 
   // Listen for booking cancellation events
   useEffect(() => {
@@ -205,7 +205,6 @@ const ActiveCard = ({
 
   const isCash = paymentMethod === "cash";
 
-  // Calculate reference time for cancel grace period
   const getReferenceTime = (): Date | null => {
     if (bookingType.type === "schedule") {
       return new Date(bookingType.value);
@@ -220,191 +219,194 @@ const ActiveCard = ({
     }
     return null;
   };
+
   return (
+    // Outer view: shadow only, no overflow-hidden (elevation + overflow-hidden
+    // fight on Android and can clip the shadow)
     <View
       style={{
         shadowColor: "#000",
         shadowOffset: {width: 0, height: 4},
         shadowOpacity: 0.3,
         shadowRadius: 8,
-        elevation: 8, // for Android
+        elevation: 8,
       }}
       className="rounded-2xl"
     >
-      <Pressable
-        onPress={onPressSeeMore}
-        className="overflow-hidden bg-white rounded-2xl active:opacity-90"
-      >
-        {/* Header */}
-        <View className="flex-row justify-between items-center px-5 py-3 bg-lightPrimary">
-          <Text
-            className={`font-semibold text-white ${maxLoadKg ? "text-base" : "text-lg"}`}
-          >
-            {vehicle} {maxLoadKg ? `(${maxLoadKg}kg)` : ""}
-          </Text>
-          <Pressable
-            className="flex-row gap-2 items-center active:scale-105"
-            hitSlop={15}
-            onPress={() =>
-              pushOnce({
-                pathname: "/(root_screens)/booking/viewOnMap",
-                params: {bookingId: id, shouldGoBack: "true"},
-              })
-            }
-          >
-            <Text className="text-sm font-semibold text-white underline">
-              View on Map
+      {/* Inner view: actual clip boundary for the whole card */}
+      <View className="overflow-hidden bg-white rounded-2xl">
+        <Pressable onPress={onPressSeeMore} className="active:opacity-90">
+          {/* Header */}
+          <View className="flex-row justify-between items-center px-5 py-3 bg-lightPrimary">
+            <Text
+              className={`font-semibold text-white ${maxLoadKg ? "text-base" : "text-lg"}`}
+            >
+              {vehicle} {maxLoadKg ? `(${maxLoadKg}kg)` : ""}
             </Text>
-            <Ionicons name="arrow-forward" size={16} color="white" />
-          </Pressable>
-        </View>
-        {booking.status === "need_continuance" && (
-          <View className="px-4 py-3 bg-amber-50 border-b border-amber-100">
-            <Text className="text-sm font-semibold text-amber-900">
-              Finding a replacement driver
-            </Text>
-            <Text className="mt-1 text-xs leading-5 text-amber-800">
-              No action needed. Your price stays the same. We will assign a
-              new driver automatically.
-            </Text>
+            <Pressable
+              className="flex-row gap-2 items-center active:scale-105"
+              hitSlop={15}
+              onPress={() =>
+                pushOnce({
+                  pathname: "/(root_screens)/booking/viewOnMap",
+                  params: {bookingId: id, shouldGoBack: "true"},
+                })
+              }
+            >
+              <Text className="text-sm font-semibold text-white underline">
+                View on Map
+              </Text>
+              <Ionicons name="arrow-forward" size={16} color="white" />
+            </Pressable>
           </View>
-        )}
-        <View className="px-4 py-3">
-          <Text className="mb-1 text-sm font-semibold text-gray-500">
-            Driver
-          </Text>
-          <View className="flex-row justify-between items-center">
-            <View className="flex-row gap-2 justify-center items-center">
-              {driver.profilePictureUrl ? (
-                <View className="w-[44px] h-[44px] rounded-full overflow-hidden">
-                  <Image
-                    source={{uri: driver.profilePictureUrl}}
-                    style={{width: "100%", height: "100%"}}
-                    contentFit="cover"
-                  />
-                </View>
-              ) : (
-                <Ionicons name="person-circle" size={50} color="#F7931E" />
-              )}
-              <View>
-                <Text className="text-lg font-semibold text-gray-800">
-                  {driver.name}
-                </Text>
-                <View className="flex-row gap-2 items-center">
-                  <StarDisplay rating={driver.rating} />
-                  <Text className="text-sm font-semibold text-gray-600">
-                    ({driver.rating})
+
+          {booking.status === "need_continuance" && (
+            <View className="px-4 py-3 bg-amber-50 border-b border-amber-100">
+              <Text className="text-sm font-semibold text-amber-900">
+                Finding a replacement driver
+              </Text>
+              <Text className="mt-1 text-xs leading-5 text-amber-800">
+                No action needed. Your price stays the same. We will assi`gn a
+                new driver automatically.
+              </Text>
+            </View>
+          )}
+
+          <View className="px-4 py-3">
+            <Text className="mb-1 text-sm font-semibold text-gray-500">
+              Driver
+            </Text>
+            <View className="flex-row justify-between items-center">
+              <View className="flex-row gap-2 justify-center items-center">
+                {driver.profilePictureUrl ? (
+                  <View className="w-[44px] h-[44px] rounded-full overflow-hidden">
+                    <Image
+                      source={{uri: driver.profilePictureUrl}}
+                      style={{width: "100%", height: "100%"}}
+                      contentFit="cover"
+                    />
+                  </View>
+                ) : (
+                  <Ionicons name="person-circle" size={50} color="#F7931E" />
+                )}
+                <View>
+                  <Text className="text-lg font-semibold text-gray-800">
+                    {driver.name}
                   </Text>
+                  <View className="flex-row gap-2 items-center">
+                    <StarDisplay rating={driver.rating} />
+                    <Text className="text-sm font-semibold text-gray-600">
+                      ({driver.rating})
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <View className="flex-row gap-5">
-              <Pressable
-                className="items-center active:scale-110"
-                hitSlop={20}
-                onPress={() =>
-                  pushOnce({
-                    pathname: "/message",
-                    params: {
-                      conversationId: createConversationId(
-                        useAppStore.getState().id!,
-                        driver.id,
-                      ),
-                    },
-                  })
-                }
-              >
-                <Ionicons
-                  name="chatbubble-ellipses"
-                  size={Platform.OS === "ios" ? 28 : 24}
-                  color="#F7931E"
-                />
-                <Text className="text-sm text-gray-600">Chat</Text>
-              </Pressable>
-              <Pressable
-                className="items-center active:scale-110"
-                hitSlop={20}
-                onPress={() => {
-                  const phoneNumber = driver.phoneNumber;
-                  if (!phoneNumber) return;
-                  Linking.openURL(`tel:${phoneNumber}`).catch(() => {
-                    Alert.alert("Unable to place call", "Please try again.");
-                  });
-                }}
-              >
-                <Ionicons
-                  name="call"
-                  size={Platform.OS === "ios" ? 28 : 24}
-                  color="#F7931E"
-                />
-                <Text className="text-sm text-gray-600">Call</Text>
-              </Pressable>
+              <View className="flex-row gap-5">
+                <Pressable
+                  className="items-center active:scale-110"
+                  hitSlop={20}
+                  onPress={() =>
+                    pushOnce({
+                      pathname: "/message",
+                      params: {
+                        conversationId: createConversationId(
+                          useAppStore.getState().id!,
+                          driver.id,
+                        ),
+                      },
+                    })
+                  }
+                >
+                  <Ionicons
+                    name="chatbubble-ellipses"
+                    size={Platform.OS === "ios" ? 28 : 24}
+                    color="#F7931E"
+                  />
+                  <Text className="text-sm text-gray-600">Chat</Text>
+                </Pressable>
+                <Pressable
+                  className="items-center active:scale-110"
+                  hitSlop={20}
+                  onPress={() => {
+                    const phoneNumber = driver.phoneNumber;
+                    if (!phoneNumber) return;
+                    Linking.openURL(`tel:${phoneNumber}`).catch(() => {
+                      Alert.alert("Unable to place call", "Please try again.");
+                    });
+                  }}
+                >
+                  <Ionicons
+                    name="call"
+                    size={Platform.OS === "ios" ? 28 : 24}
+                    color="#F7931E"
+                  />
+                  <Text className="text-sm text-gray-600">Call</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Body */}
-        <View className="px-3 py-5">
-          {/* Pickup & Drop */}
-          <View className="relative flex-row justify-between items-center pl-7 mr-2 ml-5 border-l border-dashed">
-            <View className="gap-4">
-              <Text
-                className={`font-medium ${Platform.OS === "ios" ? "max-w-60" : "max-w-52"}`}
-                numberOfLines={2}
-              >
-                {formatLocation(pickup)}
+          {/* Body */}
+          <View className="px-3 py-5">
+            <View className="relative flex-row justify-between items-center pl-7 mr-2 ml-5 border-l border-dashed">
+              <View className="gap-4">
+                <Text
+                  className={`font-medium ${Platform.OS === "ios" ? "max-w-60" : "max-w-52"}`}
+                  numberOfLines={2}
+                >
+                  {formatLocation(pickup)}
+                </Text>
+                <Text
+                  className={`font-medium ${Platform.OS === "ios" ? "max-w-60" : "max-w-52"}`}
+                  numberOfLines={2}
+                >
+                  {formatLocation(dropoff)}
+                </Text>
+              </View>
+              <Text className="font-bold">{distance.toFixed(1)}km</Text>
+
+              <Ionicons
+                name="location-sharp"
+                size={24}
+                className="absolute -left-3.5 -top-1 bg-white"
+              />
+              <Ionicons
+                name="flag-outline"
+                size={24}
+                className="absolute -left-3.5 -bottom-1 bg-white"
+              />
+            </View>
+
+            <View className="flex-row justify-between items-center p-4 mt-6 bg-gray-100 rounded-lg">
+              <Text className="text-base text-gray-600">
+                {isCash ? "Cash Payment" : "Online Payment"}
               </Text>
-              <Text
-                className={`font-medium ${Platform.OS === "ios" ? "max-w-60" : "max-w-52"}`}
-                numberOfLines={2}
-              >
-                {formatLocation(dropoff)}
+              <Text className="text-lg font-semibold text-darkPrimary">
+                Php{" "}
+                {amount.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </Text>
             </View>
-            <Text className="font-bold">{distance.toFixed(1)}km</Text>
 
-            <Ionicons
-              name="location-sharp"
-              size={24}
-              className="absolute -left-3.5 -top-1 bg-white"
-            />
-            <Ionicons
-              name="flag-outline"
-              size={24}
-              className="absolute -left-3.5 -bottom-1 bg-white"
-            />
+            <Pressable
+              className="justify-center items-center mt-6 active:scale-105"
+              onPress={onPressSeeMore}
+            >
+              <Text className="text-sm font-medium">+ See more</Text>
+            </Pressable>
           </View>
-          {/* Payment */}
-          <View className="flex-row justify-between items-center p-4 mt-6 bg-gray-100 rounded-lg">
-            <Text className="text-base text-gray-600">
-              {isCash ? "Cash Payment" : "Online Payment"}
-            </Text>
-            <Text className="text-lg font-semibold text-darkPrimary">
-              Php{" "}
-              {amount.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </Text>
-          </View>
+        </Pressable>
 
-          <Pressable
-            className="justify-center items-center mt-6 active:scale-105"
-            onPress={onPressSeeMore}
-          >
-            <Text className="text-sm font-medium">+ See more</Text>
-          </Pressable>
-        </View>
-      </Pressable>
-
-      {/* Cancel button for driver no-show */}
-      <CancelBookingButton
-        bookingId={id}
-        referenceTime={getReferenceTime()}
-        graceMinutes={driverNoShowMinutes}
-        onCancelled={onCancelled}
-      />
+        <CancelBookingButton
+          bookingId={id}
+          referenceTime={getReferenceTime()}
+          graceMinutes={driverNoShowMinutes}
+          onCancelled={onCancelled}
+        />
+      </View>
     </View>
   );
 };

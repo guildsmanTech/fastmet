@@ -1,12 +1,12 @@
-import { useMarkAnnouncementAsRead } from "@/mutations/announcementMutation";
-import { getTypeBadgeStyle } from "@/utils/notif";
+import {useMarkAnnouncementAsRead} from "@/mutations/announcementMutation";
+import {getTypeBadgeStyle} from "@/utils/notif";
 import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import { useEffect, useRef } from "react";
-import { Dimensions, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {useEffect, useRef} from "react";
+import {Dimensions, Text, View} from "react-native";
+import {useSafeAreaInsets} from "react-native-safe-area-context";
 
 type Props = {
   notification: any;
@@ -23,12 +23,12 @@ export default function NotificationDetailSheet({
   const sheetRef = useRef<BottomSheet>(null);
   const insets = useSafeAreaInsets();
 
-  const { mutate } = useMarkAnnouncementAsRead();
+  const {mutate} = useMarkAnnouncementAsRead();
 
   useEffect(() => {
     if (notification) {
       if (!notification.isRead) {
-        mutate(notification._id);
+        mutate({id: notification._id, contentType: "announcement"});
       }
     } else {
       sheetRef.current?.close();

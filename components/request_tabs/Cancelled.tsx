@@ -1,7 +1,7 @@
 import useSeeMoreDetails from "@/hooks/useSeeMoreDetails";
 import {useMarkAsReadMutation} from "@/mutations/booking";
 import {useUserBookings} from "@/queries/bookingQueries";
-import {ActiveBooking, Booking} from "@/types/book";
+import {Booking} from "@/types/book";
 import {formatDate} from "@/utils/helpers/date";
 import {Ionicons} from "@expo/vector-icons";
 import {useEffect} from "react";
@@ -27,7 +27,7 @@ export default function CancelledRoute({count}: {count: number}) {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useUserBookings<ActiveBooking>("cancelled", 5);
+  } = useUserBookings("cancelled", 5);
 
   const {mutate: markAsReadBooking, isPending: isMarkingAsRead} =
     useMarkAsReadMutation();

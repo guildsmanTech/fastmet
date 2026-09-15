@@ -8,15 +8,14 @@ export type AnnouncementItem =
       tag: "Announcement" | "Drivers" | "Users" | "Guide" | "Updates";
       readTime: number;
       createdAt: string;
-      isRead: true;
+      isRead: boolean;
     }
   | {
-      source: "notification";
+      source: "announcement";
       _id: string;
       title: string;
       message: string;
       type: string;
-      isBroadcast: boolean;
       isRead: boolean;
       createdAt: string;
     };

@@ -1,8 +1,8 @@
-import { markNotificationAsRead } from "@/api/notification";
-import { queryClient } from "@/lib/queryClient";
-import { useAppStore } from "@/store/useAppStore";
-import { AnnouncementItem } from "@/types/announcement";
-import { InfiniteData, useMutation } from "@tanstack/react-query";
+import {markAnnouncementAsRead} from "@/api/announcement";
+import {queryClient} from "@/lib/queryClient";
+import {useAppStore} from "@/store/useAppStore";
+import {AnnouncementItem} from "@/types/announcement";
+import {InfiniteData, useMutation} from "@tanstack/react-query";
 
 type AnnouncementsPage = {
   items: AnnouncementItem[];
@@ -10,7 +10,7 @@ type AnnouncementsPage = {
   nextPage: number | null;
 };
 
-type UnreadCountResponse = { unreadCount: number };
+type UnreadCountResponse = {unreadCount: number};
 
 export const useMarkAnnouncementAsRead = () => {
   const setUnreadAnnouncementCount = useAppStore(
@@ -18,10 +18,15 @@ export const useMarkAnnouncementAsRead = () => {
   );
 
   return useMutation({
-    mutationFn: (notificationId: string) =>
-      markNotificationAsRead(notificationId),
-    onMutate: async (notificationId: string) => {
-      await queryClient.cancelQueries({ queryKey: ["announcements"] });
+    mutationFn: ({
+      id,
+      contentType,
+    }: {
+      id: string;
+      contentType: "news" | "announcement";
+    }) => markAnnouncementAsRead(id, contentType),
+    onMutate: async ({id}) => {
+      await queryClient.cancelQueries({queryKey: ["announcements"]});
       await queryClient.cancelQueries({
         queryKey: ["announcementUnreadCount"],
       });
@@ -34,17 +39,17 @@ export const useMarkAnnouncementAsRead = () => {
 
       const previousAnnouncementsQueries = queryClient.getQueriesData<
         InfiniteData<AnnouncementsPage>
-      >({ queryKey: ["announcements"] });
+      >({queryKey: ["announcements"]});
 
       let foundInCache = false;
       let wasUnread = false;
       for (const [, data] of previousAnnouncementsQueries) {
         if (!data?.pages?.length) continue;
         for (const page of data.pages) {
-          const match = page.items?.find((n) => n._id === notificationId);
+          const match = page.items?.find((n) => n._id === id);
           if (match) {
             foundInCache = true;
-            wasUnread = match.source === "notification" && !match.isRead;
+            wasUnread = !match.isRead;
             break;
           }
         }
@@ -52,7 +57,7 @@ export const useMarkAnnouncementAsRead = () => {
       }
 
       queryClient.setQueriesData<InfiniteData<AnnouncementsPage>>(
-        { queryKey: ["announcements"] },
+        {queryKey: ["announcements"]},
         (old) => {
           if (!old?.pages?.length) return old;
           return {
@@ -60,9 +65,7 @@ export const useMarkAnnouncementAsRead = () => {
             pages: old.pages.map((page) => ({
               ...page,
               items: page.items.map((n) =>
-                n._id === notificationId && n.source === "notification"
-                  ? { ...n, isRead: true }
-                  : n,
+                n._id === id ? {...n, isRead: true} : n,
               ),
             })),
           };
@@ -76,7 +79,7 @@ export const useMarkAnnouncementAsRead = () => {
         const nextCount = Math.max(0, baseCount - 1);
         queryClient.setQueryData<UnreadCountResponse>(
           ["announcementUnreadCount"],
-          { unreadCount: nextCount },
+          {unreadCount: nextCount},
         );
         setUnreadAnnouncementCount(nextCount);
       }
@@ -87,7 +90,7 @@ export const useMarkAnnouncementAsRead = () => {
         prevStoreCount,
       };
     },
-    onError: (_err, _notificationId, context) => {
+    onError: (_err, _vars, context) => {
       if (!context) return;
 
       for (const [key, data] of context.previousAnnouncementsQueries) {

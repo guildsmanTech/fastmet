@@ -1,15 +1,16 @@
 import useSeeMoreDetails from "@/hooks/useSeeMoreDetails";
-import { queryClient } from "@/lib/queryClient";
-import { useUserBookings } from "@/queries/bookingQueries";
-import { useSocket } from "@/sockets/context/SocketProvider";
-import { useAppStore } from "@/store/useAppStore";
-import { useDriverLocationStore } from "@/store/useDriverLocationStore";
-import { Booking, Driver, LocationDetails, RequestedDriver } from "@/types/book";
-import { formatDate } from "@/utils/helpers/date";
-import { formatLocation } from "@/utils/helpers/location";
-import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import { useCallback, useEffect, useState } from "react";
+import {queryClient} from "@/lib/queryClient";
+import {useRescheduleBookingMutation} from "@/mutations/booking";
+import {useUserBookings} from "@/queries/bookingQueries";
+import {useSocket} from "@/sockets/context/SocketProvider";
+import {useAppStore} from "@/store/useAppStore";
+import {useDriverLocationStore} from "@/store/useDriverLocationStore";
+import {Booking, Driver, LocationDetails, RequestedDriver} from "@/types/book";
+import {formatDate} from "@/utils/helpers/date";
+import {formatLocation} from "@/utils/helpers/location";
+import {Ionicons} from "@expo/vector-icons";
+import {Image} from "expo-image";
+import {useCallback, useEffect, useState} from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -20,18 +21,17 @@ import {
   Text,
   View,
 } from "react-native";
-import Popover, { PopoverPlacement } from "react-native-popover-view";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Popover, {PopoverPlacement} from "react-native-popover-view";
+import {useSafeAreaInsets} from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import ConfirmCancelBookingModal from "../modals/confirmCancelBookingModal";
-import RescheduleModal from "../modals/rescheduleModal";
-import { useRescheduleBookingMutation } from "@/mutations/booking";
 import DriverDetailsModal from "../modals/driverDetailsModal";
+import RescheduleModal from "../modals/rescheduleModal";
 import SeeMoreModalDisplay from "../modals/seeMoreModalDisplay";
 import StarDisplay from "../StarDisplay";
 
 export default function RequestRoute() {
-  const { modalVisible, setModalVisible, selectedRequest, handleSeeMorePress } =
+  const {modalVisible, setModalVisible, selectedRequest, handleSeeMorePress} =
     useSeeMoreDetails<Booking>();
   /** Which booking's drivers list is open. Null = drivers modal closed. */
   const [driversModalBookingId, setDriversModalBookingId] = useState<
@@ -53,8 +53,8 @@ export default function RequestRoute() {
   const rescheduleMutation = useRescheduleBookingMutation();
 
   // Fetch first page of both statuses on mount
-  const pendingQuery = useUserBookings<Booking>("pending", 5);
-  const scheduledQuery = useUserBookings<Booking>("scheduled", 5);
+  const pendingQuery = useUserBookings("pending", 5);
+  const scheduledQuery = useUserBookings("scheduled", 5);
 
   const isLoading = pendingQuery.isPending && scheduledQuery.isPending;
   const error = pendingQuery.error || scheduledQuery.error;
@@ -111,7 +111,7 @@ export default function RequestRoute() {
 
   const handleCancelBook = () => {
     setLoading(true);
-    socket.emit("cancelBookingRequest", { bookingId: selectedId });
+    socket.emit("cancelBookingRequest", {bookingId: selectedId});
     setSelectedId(null);
   };
 
@@ -138,7 +138,7 @@ export default function RequestRoute() {
 
     // Optimistically remove declined driver from pending booking card
     queryClient.setQueriesData(
-      { queryKey: ["userBookings", "pending"] },
+      {queryKey: ["userBookings", "pending"]},
       (oldData: any) => {
         if (!oldData?.pages) return oldData;
 
@@ -173,10 +173,10 @@ export default function RequestRoute() {
   useEffect(() => {
     const bookingCancelled = (bookingId: string) => {
       setLoading(false);
-      
+
       // Clear driver location cache for this booking
       useDriverLocationStore.getState().clearDriverLocationCache(bookingId);
-      
+
       queryClient.invalidateQueries({
         queryKey: ["userBookings", "pending"],
         exact: false,
@@ -355,7 +355,7 @@ export default function RequestRoute() {
           paddingBottom: 40,
           gap: 15,
         }}
-        renderItem={({ item }) => (
+        renderItem={({item}) => (
           <RequestCard
             driver={item.driver}
             maxLoadKg={item.selectedVehicle.maxLoadKg ?? 0}
@@ -514,7 +514,7 @@ const RequestCard = ({
       <View
         style={{
           shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
+          shadowOffset: {width: 0, height: 4},
           shadowOpacity: 0.3,
           shadowRadius: 8,
           elevation: 8,
@@ -570,7 +570,7 @@ const RequestCard = ({
               <View className="flex-row items-center p-3 mt-6 bg-green-50 rounded-xl">
                 {driver.profilePictureUrl ? (
                   <Image
-                    source={{ uri: driver.profilePictureUrl }}
+                    source={{uri: driver.profilePictureUrl}}
                     style={{
                       width: 48,
                       height: 48,
@@ -624,13 +624,13 @@ const RequestCard = ({
                   {/* Stacked Avatars */}
                   <View
                     className="flex-row items-center"
-                    style={{ marginRight: 12 }}
+                    style={{marginRight: 12}}
                   >
                     {displayedAvatars.map((driver, index) =>
                       driver.profilePicture ? (
                         <Image
                           key={driver.id}
-                          source={{ uri: driver.profilePicture }}
+                          source={{uri: driver.profilePicture}}
                           style={{
                             width: 40,
                             height: 40,
@@ -777,7 +777,7 @@ const DriversListModal = ({
         />
         <View
           className="max-h-[75%] rounded-t-3xl bg-white"
-          style={{ paddingBottom: inset.bottom }}
+          style={{paddingBottom: inset.bottom}}
         >
           {/* Header */}
           <View className="flex-row justify-between items-center px-6 py-4 border-b border-gray-200">
@@ -797,7 +797,7 @@ const DriversListModal = ({
           <ScrollView
             className="px-4 py-4"
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
+            contentContainerStyle={{paddingBottom: 20}}
           >
             {drivers.map((driver) => (
               <Pressable
@@ -808,8 +808,8 @@ const DriversListModal = ({
                 <View className="flex-row flex-1 gap-3 items-center">
                   {driver.profilePicture ? (
                     <Image
-                      source={{ uri: driver.profilePicture }}
-                      style={{ width: 50, height: 50, borderRadius: 25 }}
+                      source={{uri: driver.profilePicture}}
+                      style={{width: 50, height: 50, borderRadius: 25}}
                     />
                   ) : (
                     <Ionicons name="person-circle" size={50} color="#F7931E" />
@@ -822,7 +822,8 @@ const DriversListModal = ({
                     <View className="flex-row gap-1 items-center mt-1">
                       <Ionicons name="star" size={14} color="#FBBF24" />
                       <Text className="text-sm text-gray-600">
-                        {driver.rating} ({driver.totalBookings} trip{driver.totalBookings !== 1 ? "s" : ""} completed)
+                        {driver.rating} ({driver.totalBookings} trip
+                        {driver.totalBookings !== 1 ? "s" : ""} completed)
                       </Text>
                     </View>
                   </View>

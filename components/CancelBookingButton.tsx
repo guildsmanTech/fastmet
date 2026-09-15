@@ -46,7 +46,8 @@ export default function CancelBookingButton({
               Toast.show({
                 type: "success",
                 text1: "Booking Cancelled",
-                text2: "Driver no-show reported",
+                text2:
+                  "You can report the driver as a no-show through the Customer Support page.",
                 position: "top",
                 topOffset: 50,
               });

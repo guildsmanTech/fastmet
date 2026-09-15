@@ -4,16 +4,11 @@ import {
   useRateDriverMutation,
 } from "@/mutations/booking";
 import {useUserBookings} from "@/queries/bookingQueries";
-import {useAppStore} from "@/store/useAppStore";
 import {CompletedBooking, LocationDetails} from "@/types/book";
-import {
-  createConversationId,
-  getBookingTimelineItems,
-} from "@/utils/helpers/booking";
+import {getBookingTimelineItems} from "@/utils/helpers/booking";
 import {formatLocation} from "@/utils/helpers/location";
 import {Ionicons} from "@expo/vector-icons";
 import {Image} from "expo-image";
-import {router} from "expo-router";
 import {useEffect, useMemo, useState} from "react";
 import {
   ActivityIndicator,
@@ -51,7 +46,7 @@ export default function CompletedRoute({count}: {count: number}) {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useUserBookings<CompletedBooking>("completed", 5);
+  } = useUserBookings("completed", 5);
 
   const {mutate: markAsReadBooking, isPending: isMarkingAsRead} =
     useMarkAsReadMutation();
@@ -441,28 +436,17 @@ function SeeMoreModal({
                   </View>
                 </View>
 
-                <Pressable
-                  className="items-center active:scale-110"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/message",
-                      params: {
-                        conversationId: createConversationId(
-                          useAppStore.getState().id!,
-                          data.driver.id,
-                        ),
-                      },
-                    })
-                  }
-                  hitSlop={20}
-                >
-                  <Ionicons
-                    name="chatbubble-ellipses"
-                    size={Platform.OS === "ios" ? 28 : 24}
-                    color="#F7931E"
-                  />
-                  <Text className="text-sm text-gray-600">Chat</Text>
-                </Pressable>
+                <View className="items-end">
+                  <Text className="mb-1 text-xs text-gray-500">
+                    Your Rating
+                  </Text>
+                  <View className="flex-row gap-1 items-center">
+                    <Ionicons name="star" size={16} color="#FFD700" />
+                    <Text className="text-sm font-semibold text-gray-800">
+                      {data.driverRating}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </View>
           )}
