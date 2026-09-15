@@ -133,6 +133,10 @@ export default function NewsDetailScreen() {
             {news.title}
           </Text>
 
+          <View className="pl-3 mt-3 border-l-4 border-gray-200">
+            <Text className="text-sm italic text-gray-500">{news.excerpt}</Text>
+          </View>
+
           <View className="mt-4">
             <RenderHTML
               contentWidth={width - 32}
