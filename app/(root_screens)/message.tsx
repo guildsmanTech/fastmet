@@ -1,19 +1,19 @@
 import ImageViewer from "@/components/ImageViewer";
-import {queryClient} from "@/lib/queryClient";
-import {useConversationById} from "@/queries/conversation";
-import {useSocket} from "@/sockets/context/SocketProvider";
-import {useAppStore} from "@/store/useAppStore";
-import {ConversationResponse, MessagesLoadedData} from "@/types/chat";
+import { queryClient } from "@/lib/queryClient";
+import { useConversationById } from "@/queries/conversation";
+import { useSocket } from "@/sockets/context/SocketProvider";
+import { useAppStore } from "@/store/useAppStore";
+import { ConversationResponse, MessagesLoadedData } from "@/types/chat";
 import {
   convertImageToBase64,
   openGallery,
   takePhoto,
 } from "@/utils/helpers/imagePicker";
-import {Ionicons} from "@expo/vector-icons";
-import {InfiniteData} from "@tanstack/react-query";
-import {Image} from "expo-image";
-import {router, useLocalSearchParams, useNavigation} from "expo-router";
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { InfiniteData } from "@tanstack/react-query";
+import { Image } from "expo-image";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,8 +26,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import {Bubble, GiftedChat, IMessage} from "react-native-gifted-chat";
-import {SafeAreaView} from "react-native-safe-area-context";
+import { Bubble, GiftedChat, IMessage } from "react-native-gifted-chat";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
 const Message = () => {
@@ -74,17 +74,17 @@ const Message = () => {
         createdAt: new Date(msg.createdAt),
         user: isMyMessage
           ? {
-              _id: useAppStore.getState().id || "unknown",
-              name: useAppStore.getState().name || "Me",
-              avatar: useAppStore.getState().profilePictureUrl || "",
-            }
+            _id: useAppStore.getState().id || "unknown",
+            name: useAppStore.getState().name || "Me",
+            avatar: useAppStore.getState().profilePictureUrl || "",
+          }
           : {
-              _id: conversation?.driver._id || "unknown",
-              name:
-                `${conversation?.driver.firstName} ${conversation?.driver.lastName}` ||
-                "Driver",
-              avatar: conversation?.driver.profilePictureUrl || "",
-            },
+            _id: conversation?.driver._id || "unknown",
+            name:
+              `${conversation?.driver.firstName} ${conversation?.driver.lastName}` ||
+              "Driver",
+            avatar: conversation?.driver.profilePictureUrl || "",
+          },
       };
     },
     [conversation],
@@ -111,7 +111,7 @@ const Message = () => {
     console.log("Opening chat, joining room...");
 
     // Join conversation room
-    socket.emit("join_room", {clientId: useAppStore.getState().id, driverId});
+    socket.emit("join_room", { clientId: useAppStore.getState().id, driverId });
 
     // Handle room joined
     const handleRoomJoined = (data: {
@@ -159,7 +159,7 @@ const Message = () => {
     };
 
     // Handle errors
-    const handleMessageError = (error: {error?: string}) => {
+    const handleMessageError = (error: { error?: string }) => {
       console.error("Message error:", error);
       setIsUploadingImage(false);
       Toast.show({
@@ -246,7 +246,7 @@ const Message = () => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
-      socket.emit("leave_room", {conversationId});
+      socket.emit("leave_room", { conversationId });
 
       // Reset unread count in conversations cache for this conversation
       type ConversationsPage = {
@@ -258,7 +258,7 @@ const Message = () => {
       const driverId = useAppStore.getState().id;
 
       queryClient.setQueriesData<InfiniteData<ConversationsPage>>(
-        {queryKey: ["conversations"]},
+        { queryKey: ["conversations"] },
         (old) => {
           if (!old?.pages?.length) return old;
           return {
@@ -269,7 +269,7 @@ const Message = () => {
                 if (c._id !== conversationId) return c;
                 const updated = {
                   ...c,
-                  unreadCount: {...c.unreadCount, client: 0},
+                  unreadCount: { ...c.unreadCount, client: 0 },
                 };
                 if (latestMsg) {
                   updated.lastMessage =
@@ -426,7 +426,7 @@ const Message = () => {
                         _id: Date.now(),
                         text,
                         createdAt: new Date(),
-                        user: {_id: useAppStore.getState().id!},
+                        user: { _id: useAppStore.getState().id! },
                       },
                     ]);
                     setText("");
@@ -462,7 +462,7 @@ const Message = () => {
         }}
       >
         <Image
-          source={{uri: props.currentMessage.image}}
+          source={{ uri: props.currentMessage.image }}
           contentFit="contain"
           style={{
             width: 200,
@@ -486,7 +486,7 @@ const Message = () => {
   return (
     <SafeAreaView className="flex-1 bg-secondary">
       <KeyboardAvoidingView
-        style={{flex: 1}}
+        style={{ flex: 1 }}
         behavior={
           Platform.OS === "ios"
             ? "padding"
@@ -514,8 +514,8 @@ const Message = () => {
 
             {conversation?.driver?.profilePictureUrl ? (
               <Image
-                source={{uri: conversation.driver.profilePictureUrl}}
-                style={{width: 40, height: 40, borderRadius: 999}}
+                source={{ uri: conversation.driver.profilePictureUrl }}
+                style={{ width: 40, height: 40, borderRadius: 999 }}
                 contentFit="cover"
               />
             ) : (
@@ -541,22 +541,24 @@ const Message = () => {
             </View>
           </View>
 
-          <Pressable
-            hitSlop={20}
-            onPress={() => {
-              const phoneNumber = conversation?.driver.phoneNumber;
-              if (!phoneNumber) return;
-              Linking.openURL(`tel:${phoneNumber}`).catch(() => {
-                Alert.alert("Unable to place call", "Please try again.");
-              });
-            }}
-          >
-            <Ionicons
-              name="call"
-              size={Platform.OS === "ios" ? 28 : 24}
-              color="#FFA840"
-            />
-          </Pressable>
+          {canSendMessages && (
+            <Pressable
+              hitSlop={20}
+              onPress={() => {
+                const phoneNumber = conversation?.driver.phoneNumber;
+                if (!phoneNumber) return;
+                Linking.openURL(`tel:${phoneNumber}`).catch(() => {
+                  Alert.alert("Unable to place call", "Please try again.");
+                });
+              }}
+            >
+              <Ionicons
+                name="call"
+                size={Platform.OS === "ios" ? 28 : 24}
+                color="#FFA840"
+              />
+            </Pressable>
+          )}
         </View>
 
         <GiftedChat
@@ -587,7 +589,7 @@ const Message = () => {
       </KeyboardAvoidingView>
 
       <ImageViewer
-        images={[{uri: selectedImageUrl}]}
+        images={[{ uri: selectedImageUrl }]}
         imageIndex={0}
         visible={imageViewerVisible}
         onRequestClose={() => setImageViewerVisible(false)}
@@ -630,7 +632,7 @@ export const renderChatEmpty = () => {
     <View
       className="items-center px-6 pb-20"
       style={{
-        transform: [{scaleY: -1}, {scaleX: Platform.OS === "android" ? -1 : 1}],
+        transform: [{ scaleY: -1 }, { scaleX: Platform.OS === "android" ? -1 : 1 }],
       }}
     >
       <Ionicons name="chatbubbles-outline" size={100} color="#9CA3AF" />

@@ -1,11 +1,11 @@
-import {LocationDetails, RouteData} from "@/types/book";
-import {Service} from "@/types/vehicle";
-import {BookingTimelineItem} from "@/utils/helpers/booking";
-import {formatDate} from "@/utils/helpers/date";
-import {formatLocation} from "@/utils/helpers/location";
-import {Ionicons} from "@expo/vector-icons";
-import {Image} from "expo-image";
-import {Platform, Pressable, Text, View} from "react-native";
+import { LocationDetails, RouteData } from "@/types/book";
+import { Service } from "@/types/vehicle";
+import { BookingTimelineItem } from "@/utils/helpers/booking";
+import { formatDate } from "@/utils/helpers/date";
+import { formatLocation } from "@/utils/helpers/location";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { Platform, Pressable, Text, View } from "react-native";
 
 export const SeeMoreHeader = ({
   onClose,
@@ -19,7 +19,7 @@ export const SeeMoreHeader = ({
       <Pressable
         onPress={onClose}
         className="absolute top-1 left-4"
-        hitSlop={{top: 20, left: 20, bottom: 20, right: 20}}
+        hitSlop={{ top: 20, left: 20, bottom: 20, right: 20 }}
       >
         <Ionicons
           name="chevron-back-outline"
@@ -180,9 +180,9 @@ export const PaymentInfo = ({
           <Text className="text-xs font-semibold text-gray-700">
             {routeData.serviceFee > 0
               ? `Php ${routeData.serviceFee.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}`
               : "FREE"}
           </Text>
         </View>
@@ -222,7 +222,7 @@ export const PaymentInfo = ({
         {/* Total */}
         <View className="flex-row justify-between">
           <Text className="text-base font-semibold text-gray-800">
-            {voucherApplied ? "Amount Paid" : "Total Amount"}
+            {voucherApplied ? "Amount" : "Total Amount"}
           </Text>
           <Text className="text-xl font-bold text-darkPrimary">
             Php{" "}
@@ -339,9 +339,9 @@ export const SelectedServices = ({
           <Text className="text-lg font-bold text-lightPrimary">
             {totalServicesPrice > 0
               ? `₱${totalServicesPrice.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}`
               : "FREE"}
           </Text>
         </View>
@@ -350,7 +350,7 @@ export const SelectedServices = ({
   );
 };
 
-export const ItemType = ({itemType}: {itemType: string}) => {
+export const ItemType = ({ itemType }: { itemType: string }) => {
   return (
     <View className="p-5 bg-blue-50 rounded-2xl">
       <View className="flex-row items-center mb-2">
@@ -364,7 +364,7 @@ export const ItemType = ({itemType}: {itemType: string}) => {
   );
 };
 
-export const Note = ({note}: {note: string}) => {
+export const Note = ({ note }: { note: string }) => {
   return (
     <View className="p-5 bg-amber-50 rounded-2xl">
       <View className="flex-row items-center mb-2">
@@ -404,7 +404,7 @@ export const AttachedImages = ({
             className="flex-1"
           >
             <Image
-              source={{uri: img}}
+              source={{ uri: img }}
               style={{
                 flex: 1,
                 height: photos.length > 1 ? 100 : 200,
@@ -417,7 +417,7 @@ export const AttachedImages = ({
   );
 };
 
-export const BookingTimeline = ({items}: {items: BookingTimelineItem[]}) => {
+export const BookingTimeline = ({ items }: { items: BookingTimelineItem[] }) => {
   if (items.length <= 1) return null;
 
   return (
@@ -433,9 +433,8 @@ export const BookingTimeline = ({items}: {items: BookingTimelineItem[]}) => {
             <View key={`${item.label}-${index}`} className="flex-row gap-3">
               <View className="items-center">
                 <View
-                  className={`size-2.5 rounded-full ${
-                    isLast ? "bg-lightPrimary" : "bg-gray-300"
-                  }`}
+                  className={`size-2.5 rounded-full ${isLast ? "bg-lightPrimary" : "bg-gray-300"
+                    }`}
                 />
                 {!isLast && <View className="flex-1 mt-1 w-px bg-gray-200" />}
               </View>
