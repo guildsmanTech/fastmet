@@ -1,22 +1,22 @@
-import {BookingSettingsBootstrap} from "@/hooks/useBookingSettings";
-import {queryClient} from "@/lib/queryClient";
+import { BookingSettingsBootstrap } from "@/hooks/useBookingSettings";
+import { queryClient } from "@/lib/queryClient";
 import {
   Montserrat_400Regular,
   Montserrat_700Bold,
   useFonts,
 } from "@expo-google-fonts/montserrat";
-import {QueryClientProvider} from "@tanstack/react-query";
-import {SplashScreen, Stack} from "expo-router";
-import {useEffect, useState} from "react";
-import {Pressable, StatusBar, Text, View} from "react-native";
-import {GestureHandlerRootView} from "react-native-gesture-handler";
-import {SafeAreaProvider} from "react-native-safe-area-context";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { SplashScreen, Stack } from "expo-router";
+import { useEffect, useState } from "react";
+import { Pressable, StatusBar, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import AnimatedSplash from "@/components/AnimatedSplash";
 import LoadingModal from "@/components/modals/loading";
-import {toastConfig} from "@/config/toastConfig";
-import {useAuth} from "@/hooks/useAuth";
-import {useSyncAuthMeta} from "@/hooks/useSyncAuthMeta";
+import { toastConfig } from "@/config/toastConfig";
+import { useAuth } from "@/hooks/useAuth";
+import { useSyncAuthMeta } from "@/hooks/useSyncAuthMeta";
 import SocketProvider from "@/sockets/context/SocketProvider";
 import * as Sentry from "@sentry/react-native";
 import * as Device from "expo-device";
@@ -45,7 +45,7 @@ Sentry.init({
 void SplashScreen.preventAutoHideAsync();
 
 export default Sentry.wrap(function RootLayout() {
-  const {hasHydrated} = useAuth();
+  const { hasHydrated } = useAuth();
   const isEmulator = !Device.isDevice;
 
   const [fontsLoaded] = useFonts({
@@ -102,7 +102,7 @@ export default Sentry.wrap(function RootLayout() {
     return (
       <View className="flex-1 justify-center items-center px-6 bg-white">
         <Text className="mb-4 text-base text-center text-neutral-700 font-montserrat">
-          Couldn't connect. Please check your connection and try again.
+          Couldn&apos;t connect. Please check your connection and try again.
         </Text>
         <Pressable
           onPress={fetchPreRegStatus}
@@ -119,13 +119,13 @@ export default Sentry.wrap(function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{flex: 1}}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <BookingSettingsBootstrap />
           <SocketProvider>
             <AuthMetaSync />
-            <Stack screenOptions={{headerShown: false}}>
+            <Stack screenOptions={{ headerShown: false }}>
               <Stack.Protected guard={preRegActive}>
                 <Stack.Screen name="(pre_registration)" />
               </Stack.Protected>
