@@ -13,6 +13,8 @@ export enum NOTIFICATION_TYPES {
   scheduled_auto_assigned = "scheduled_auto_assigned",
   scheduled_auto_cancelled = "scheduled_auto_cancelled",
   driver_unavailable = "driver_unavailable",
+  driver_declined_reschedule = "driver_declined_reschedule",
+  driver_confirmed_reschedule = "driver_confirmed_reschedule",
   driver_started_scheduled_trip = "driver_started_scheduled_trip",
   booking_cancelled_admin = "booking_cancelled_admin",
   booking_force_completed_admin = "booking_force_completed_admin",
@@ -64,6 +66,16 @@ export const NOTIFICATION_CONFIG: Record<
     icon: "alert-circle",
     color: "#DC2626", // red
     label: "Driver Unavailable",
+  },
+  [NOTIFICATION_TYPES.driver_declined_reschedule]: {
+    icon: "time",
+    color: "#F97316",
+    label: "Driver Declined New Time",
+  },
+  [NOTIFICATION_TYPES.driver_confirmed_reschedule]: {
+    icon: "checkmark-circle",
+    color: "#10B981",
+    label: "Driver Confirmed",
   },
   [NOTIFICATION_TYPES.driver_started_scheduled_trip]: {
     icon: "navigate",

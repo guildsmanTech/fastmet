@@ -201,6 +201,75 @@ export const driverUnavailable = (socket: Socket) => {
   };
 };
 
+export const rescheduleDriverResponse = (socket: Socket) => {
+  const onDeclined = ({
+    bookingId,
+    notification,
+    unreadNotifications,
+  }: {
+    bookingId: string;
+    driverId?: string;
+    reason?: string;
+    notification?: Notification;
+    unreadNotifications?: number;
+  }) => {
+    queryClient.invalidateQueries({
+      queryKey: ["userBookings", "scheduled"],
+      exact: false,
+    });
+    queryClient.invalidateQueries({
+      queryKey: ["userBookings", "pending"],
+      exact: false,
+    });
+    queryClient.invalidateQueries({queryKey: ["userBookingCounts"]});
+
+    if (notification?._id && typeof unreadNotifications === "number") {
+      updateNotificationHelper(
+        notification,
+        unreadNotifications,
+        NOTIFICATION_TYPES.driver_declined_reschedule,
+      );
+    }
+
+    Toast.show({
+      type: "info",
+      text1: "Driver declined new time",
+      text2:
+        "Your booking is open again for other drivers. You can wait or cancel.",
+      position: "top",
+      visibilityTime: 5000,
+      swipeable: true,
+      topOffset: 50,
+    });
+    void bookingId;
+  };
+
+  const onConfirmed = ({bookingId}: {bookingId: string}) => {
+    queryClient.invalidateQueries({
+      queryKey: ["userBookings", "scheduled"],
+      exact: false,
+    });
+
+    Toast.show({
+      type: "success",
+      text1: "Driver confirmed",
+      text2: "Your driver accepted the new pickup time.",
+      position: "top",
+      visibilityTime: 4000,
+      swipeable: true,
+      topOffset: 50,
+    });
+    void bookingId;
+  };
+
+  socket.on("rescheduleDeclinedByDriver", onDeclined);
+  socket.on("rescheduleConfirmedByDriver", onConfirmed);
+  return () => {
+    socket.off("rescheduleDeclinedByDriver", onDeclined);
+    socket.off("rescheduleConfirmedByDriver", onConfirmed);
+  };
+};
+
 export const scheduledReminder = (socket: Socket) => {
   const handleScheduledReminder = ({
     notification,

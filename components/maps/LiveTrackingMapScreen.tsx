@@ -107,7 +107,10 @@ export default function LiveTrackingMapScreen({
   // Live-updating "Xm ago" label while showing cached location
   useEffect(() => {
     if (!isShowingLastKnown) return;
-    const id = setInterval(() => setLastSeenTick(Date.now()), LAST_SEEN_TICK_MS);
+    const id = setInterval(
+      () => setLastSeenTick(Date.now()),
+      LAST_SEEN_TICK_MS,
+    );
     return () => clearInterval(id);
   }, [isShowingLastKnown]);
 
@@ -322,7 +325,7 @@ export default function LiveTrackingMapScreen({
               zIndex={1000}
             >
               <View style={{width: 40, height: 40, opacity: 1}}>
-                <VehicleMarkerIcon gasCategory={gasCategory} size={40} />
+                <VehicleMarkerIcon gasCategory={gasCategory} size={50} />
               </View>
             </Marker>
           )}
@@ -348,33 +351,35 @@ export default function LiveTrackingMapScreen({
             </Marker>
           )}
 
-          {driverLocation && showDriverOnMap && status !== "need_continuance" && (
-            <MapViewDirections
-              origin={{
-                latitude: driverLocation.lat,
-                longitude: driverLocation.lng,
-              }}
-              destination={
-                status === "picked_up"
-                  ? {
-                      latitude: dropOff!.coords.lat,
-                      longitude: dropOff!.coords.lng,
-                    }
-                  : {
-                      latitude: pickUp!.coords.lat,
-                      longitude: pickUp!.coords.lng,
-                    }
-              }
-              apikey={GOOGLE_MAPS_API_KEY ?? ""}
-              strokeWidth={5}
-              strokeColor="#007AFF"
-              optimizeWaypoints
-              onReady={(result) => {
-                routeCoordinatesRef.current = result.coordinates;
-                fitToRoute(result.coordinates);
-              }}
-            />
-          )}
+          {driverLocation &&
+            showDriverOnMap &&
+            status !== "need_continuance" && (
+              <MapViewDirections
+                origin={{
+                  latitude: driverLocation.lat,
+                  longitude: driverLocation.lng,
+                }}
+                destination={
+                  status === "picked_up"
+                    ? {
+                        latitude: dropOff!.coords.lat,
+                        longitude: dropOff!.coords.lng,
+                      }
+                    : {
+                        latitude: pickUp!.coords.lat,
+                        longitude: pickUp!.coords.lng,
+                      }
+                }
+                apikey={GOOGLE_MAPS_API_KEY ?? ""}
+                strokeWidth={5}
+                strokeColor="#007AFF"
+                optimizeWaypoints
+                onReady={(result) => {
+                  routeCoordinatesRef.current = result.coordinates;
+                  fitToRoute(result.coordinates);
+                }}
+              />
+            )}
         </MapView>
       )}
 

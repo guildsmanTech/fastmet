@@ -15,6 +15,7 @@ import {
   driverArrivedAtDropoff,
   driverArrivedAtPickup,
   driverUnavailable,
+  rescheduleDriverResponse,
   scheduledReminder,
 } from "../handlers/booking";
 import {receiveMessage} from "../handlers/chat";
@@ -76,6 +77,7 @@ export default function SocketProvider({
       acceptanceRequestedSchedule(socket);
     const cleanupCancelScheduleDriverOffer = cancelScheduleDriverOffer(socket);
     const cleanupDriverUnavailable = driverUnavailable(socket);
+    const cleanupRescheduleDriverResponse = rescheduleDriverResponse(socket);
     const cleanupScheduledReminder = scheduledReminder(socket);
     const cleanupDriverArrivedAtPickup = driverArrivedAtPickup(socket);
     const cleanupDriverArrivedAtDropoff = driverArrivedAtDropoff(socket);
@@ -90,6 +92,7 @@ export default function SocketProvider({
       cleanupAcceptanceRequestedSchedule();
       cleanupCancelScheduleDriverOffer();
       cleanupDriverUnavailable();
+      cleanupRescheduleDriverResponse();
       cleanupScheduledReminder();
       cleanupDriverArrivedAtPickup();
       cleanupDriverArrivedAtDropoff();

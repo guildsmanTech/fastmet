@@ -66,7 +66,9 @@ export const useRescheduleBookingMutation = () =>
       bookingId: string;
       newScheduledTime: string;
     }) => rescheduleBooking(bookingId, newScheduledTime),
-    onSuccess: () => {
+    onSuccess: (data: {
+      awaitingDriverConfirmation?: boolean;
+    }) => {
       queryClient.invalidateQueries({
         queryKey: ["userBookings", "pending"],
         exact: false,
@@ -80,9 +82,11 @@ export const useRescheduleBookingMutation = () =>
       Toast.show({
         type: "success",
         text1: "Booking rescheduled",
-        text2: "Pickup time has been updated.",
+        text2: data?.awaitingDriverConfirmation
+          ? "Waiting for your driver to confirm the new time (1 hour)."
+          : "Pickup time has been updated.",
         position: "top",
-        visibilityTime: 3000,
+        visibilityTime: 4000,
         swipeable: true,
         topOffset: 50,
       });
