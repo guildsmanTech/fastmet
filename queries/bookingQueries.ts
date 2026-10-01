@@ -32,24 +32,32 @@ export const useBookingCounts = () => {
   });
 };
 
+/** Vehicle-independent: same OD+avoid shares cache for price + polyline. */
+export const drivingDistanceQueryKey = (
+  pickUp: LocationDetails | null,
+  dropOff: LocationDetails | null,
+  allowExpressway: boolean,
+) =>
+  [
+    "drivingDistance",
+    pickUp?.coords.lat,
+    pickUp?.coords.lng,
+    dropOff?.coords.lat,
+    dropOff?.coords.lng,
+    allowExpressway,
+  ] as const;
+
 export const useDrivingDistance = (
   pickUp: LocationDetails | null,
   dropOff: LocationDetails | null,
-  vehicleType: string | undefined,
+  allowExpressway = false,
 ) => {
   return useQuery({
-    queryKey: [
-      "drivingDistance",
-      pickUp?.coords.lat,
-      pickUp?.coords.lng,
-      dropOff?.coords.lat,
-      dropOff?.coords.lng,
-      vehicleType,
-    ],
-    queryFn: () => fetchDrivingDistance(pickUp!, dropOff!, vehicleType!),
-    enabled: !!pickUp && !!dropOff && !!vehicleType,
+    queryKey: drivingDistanceQueryKey(pickUp, dropOff, allowExpressway),
+    queryFn: () => fetchDrivingDistance(pickUp!, dropOff!, allowExpressway),
+    enabled: !!pickUp && !!dropOff,
     staleTime: Infinity,
-    gcTime: 1000 * 60 * 60, // cache kept in memory for 10 min after unmount
+    gcTime: 1000 * 60 * 60,
   });
 };
 

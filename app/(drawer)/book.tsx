@@ -1,16 +1,17 @@
 import BookSheet from "@/components/maps/BookSheet";
-import MapScreen, {MapScreenHandle} from "@/components/maps/MapScreen";
+import MapScreen, { MapScreenHandle } from "@/components/maps/MapScreen";
 import SearchModal from "@/components/modals/mapSearchModal";
-import {useDrivingDistance} from "@/queries/bookingQueries";
-import {useSurgeFactors} from "@/queries/pricingQueries";
-import {useAppStore} from "@/store/useAppStore";
-import {Ionicons} from "@expo/vector-icons";
-import {DrawerActions} from "@react-navigation/native";
-import {useNavigation} from "expo-router";
-import React, {useEffect, useMemo, useRef, useState} from "react";
-import {Pressable, View} from "react-native";
-import {Region} from "react-native-maps";
-import {SafeAreaView} from "react-native-safe-area-context";
+import { useDrivingDistance } from "@/queries/bookingQueries";
+import { useSurgeFactors } from "@/queries/pricingQueries";
+import { useAppStore } from "@/store/useAppStore";
+import { applyVehicleDuration, computeDistanceFee } from "@/utils/helpers/calculatePrice";
+import { Ionicons } from "@expo/vector-icons";
+import { DrawerActions } from "@react-navigation/native";
+import { useNavigation } from "expo-router";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, View } from "react-native";
+import { Region } from "react-native-maps";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const DEFAULT_REGION = {
   latitude: 14.5995, // 👈 change to your city center
@@ -18,6 +19,8 @@ const DEFAULT_REGION = {
   latitudeDelta: 0.05,
   longitudeDelta: 0.05,
 };
+
+const EMPTY_COORDINATES: { latitude: number; longitude: number }[] = [];
 
 const Book = () => {
   const pickUp = useAppStore((state) => state.pickUp);
@@ -41,27 +44,38 @@ const Book = () => {
 
   const floatingButtonStyle = {
     shadowColor: "#000",
-    shadowOffset: {width: 2, height: 2},
+    shadowOffset: { width: 2, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
   };
 
-  const {data: route, isFetching} = useDrivingDistance(
+  // Match services: expressway route when toll_fee is selected (both variants cached)
+  const allowExpressway = useMemo(
+    () => addedServices.some((s) => s.key === "toll_fee"),
+    [addedServices],
+  );
+
+  const { data: route, isFetching } = useDrivingDistance(
     pickUp,
     dropOff,
-    selectedVehicle?.key,
+    allowExpressway,
   );
 
   // ── Surge + gas factors ───────────────────────────────────────────────────
   // Only fetches when pickUp is set — cached 60s, covers all variants at once
-  const {data: surgeFactors, isLoading: isSurgeLoading} =
+  const { data: surgeFactors, isLoading: isSurgeLoading } =
     useSurgeFactors(pickUp);
+
   // ── Pricing ───────────────────────────────────────────────────────────────
   const pricing = useMemo(() => {
     if (!route || !selectedVehicle?.variant || !bookingType) return null;
 
-    const {distanceKm, durationMin} = route;
+    const { distanceKm, durationMin: rawDuration } = route;
+    const durationMin = applyVehicleDuration(
+      rawDuration,
+      selectedVehicle.key,
+    );
     const variant = selectedVehicle.variant;
     const variantKey = `${selectedVehicle.key}_${variant.maxLoadKg}`;
 
@@ -70,22 +84,11 @@ const Book = () => {
     const gasAdjFactor = factors?.gasAdjFactor ?? 1.0;
 
     const basePrice = Math.round(variant.baseFare * gasAdjFactor);
-    const sortedTiers = [...variant.pricingTiers].sort(
-      (a, b) => a.minKm - b.minKm,
+    const distanceFee = computeDistanceFee(
+      distanceKm,
+      variant,
+      bookingType.priceModifier,
     );
-
-    const distanceFee = (() => {
-      let fee = 0;
-      let remaining = distanceKm;
-      for (const tier of sortedTiers) {
-        if (remaining <= 0) break;
-        const tierMax = tier.maxKm ?? Infinity;
-        const kmInTier = Math.min(remaining, tierMax - tier.minKm);
-        fee += kmInTier * tier.pricePerKm;
-        remaining -= kmInTier;
-      }
-      return Math.round(fee * bookingType.priceModifier);
-    })();
 
     const serviceFee = addedServices.reduce((sum, s) => sum + s.price, 0);
     const subtotal = basePrice + distanceFee + serviceFee;
@@ -94,7 +97,9 @@ const Book = () => {
     // ── Pricing breakdown log ─────────────────────────────────────────────
     console.log("──────────────────────────────────────");
     console.log(`🚗 Vehicle:       ${variantKey}`);
-    console.log(`📍 Distance:      ${distanceKm.toFixed(2)} km`);
+    console.log(
+      `📍 Distance:      ${distanceKm.toFixed(2)} km (${allowExpressway ? "expressway allowed" : "service roads"})`,
+    );
     console.log(
       `⛽ Gas adj:       ×${gasAdjFactor} (base: ₱${variant.baseFare} → ₱${basePrice})`,
     );
@@ -118,7 +123,7 @@ const Book = () => {
       surgeMultiplier,
       gasAdjFactor,
     };
-  }, [route, selectedVehicle, bookingType, addedServices, surgeFactors]);
+  }, [route, selectedVehicle, bookingType, addedServices, surgeFactors, allowExpressway]);
 
   useEffect(() => {
     if (pricing) setRouteData(pricing);
@@ -130,7 +135,7 @@ const Book = () => {
 
   return (
     <SafeAreaView
-      style={{flex: 1, backgroundColor: "white"}}
+      style={{ flex: 1, backgroundColor: "white" }}
       edges={["right", "bottom", "left"]}
     >
       <View className="relative flex-1">
@@ -144,6 +149,7 @@ const Book = () => {
           setIsDragging={setIsDragging}
           bookingType={bookingType?.type ?? "asap"}
           onRouteFitChange={setIsRouteFitted}
+          routeCoordinates={route?.coordinates ?? EMPTY_COORDINATES}
         />
 
         {!isDragging && (

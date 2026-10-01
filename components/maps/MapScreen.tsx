@@ -1,7 +1,7 @@
 import {Type} from "@/store/slices/bookSlice";
 import {useAppStore} from "@/store/useAppStore";
 import {LocationDetails, RouteData} from "@/types/book";
-import {GOOGLE_MAPS_API_KEY, STATIC_IMAGES} from "@/utils/constants";
+import {STATIC_IMAGES} from "@/utils/constants";
 import {formatDuration} from "@/utils/helpers/date";
 import {Image} from "expo-image";
 import * as Location from "expo-location";
@@ -22,7 +22,6 @@ import MapView, {
   Polyline,
   PROVIDER_GOOGLE,
 } from "react-native-maps";
-import MapViewDirections from "react-native-maps-directions";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 
 type Region = {
@@ -41,6 +40,8 @@ type Props = {
   setIsDragging: React.Dispatch<React.SetStateAction<boolean>>;
   bookingType: Type;
   onRouteFitChange?: (fitted: boolean) => void;
+  /** From cached Directions fetch (same as pricing) — already respects avoid/allow. */
+  routeCoordinates?: LatLng[];
 };
 
 export type MapScreenHandle = {
@@ -59,6 +60,7 @@ const MapScreen = forwardRef<MapScreenHandle, Props>(function MapScreen(
     setIsDragging,
     bookingType,
     onRouteFitChange,
+    routeCoordinates = [],
   },
   ref,
 ) {
@@ -69,9 +71,6 @@ const MapScreen = forwardRef<MapScreenHandle, Props>(function MapScreen(
   const [isAnimating, setIsAnimating] = useState(false);
   const [tracksViewChanges, setTracksViewChanges] = useState(true);
   const setLoading = useAppStore((state) => state.setLoading);
-  const [routeCoordinates, setRouteCoordinates] = useState<LatLng[]>([]);
-
-  // const MARKER_SIZE = 40;
 
   const markRouteUnfitted = useCallback(() => {
     onRouteFitChange?.(false);
@@ -121,8 +120,6 @@ const MapScreen = forwardRef<MapScreenHandle, Props>(function MapScreen(
   );
 
   useEffect(() => {
-    if (!GOOGLE_MAPS_API_KEY) return;
-
     let isMounted = true;
 
     (async () => {
@@ -189,14 +186,20 @@ const MapScreen = forwardRef<MapScreenHandle, Props>(function MapScreen(
     onRouteFitChange,
   ]);
 
+  // Sync polyline from cached Directions result (service-road vs expressway)
+  const lastFittedKeyRef = useRef("");
   useEffect(() => {
-    if (!pickUp || !dropOff) {
-      routeCoordinatesRef.current = [];
-      setRouteCoordinates([]);
+    routeCoordinatesRef.current = routeCoordinates;
+    if (routeCoordinates.length === 0) {
+      lastFittedKeyRef.current = "";
+      return;
     }
-  }, [pickUp, dropOff]);
+    const key = `${routeCoordinates.length}:${routeCoordinates[0]?.latitude},${routeCoordinates[0]?.longitude}:${routeCoordinates[routeCoordinates.length - 1]?.latitude},${routeCoordinates[routeCoordinates.length - 1]?.longitude}`;
+    if (key === lastFittedKeyRef.current) return;
+    lastFittedKeyRef.current = key;
+    performFitToCoordinates(routeCoordinates);
+  }, [routeCoordinates, performFitToCoordinates]);
 
-  // Update the useEffect
   useEffect(() => {
     if (pickUp?.coords && mapRef.current && !isAnimating) {
       const newRegion = {
@@ -207,7 +210,6 @@ const MapScreen = forwardRef<MapScreenHandle, Props>(function MapScreen(
       };
       setRegion(newRegion);
 
-      // Only animate if dropOff doesn't exist (to avoid conflict with MapViewDirections)
       if (!dropOff) {
         setIsAnimating(true);
         mapRef.current.animateToRegion(newRegion, 1000);
@@ -245,29 +247,6 @@ const MapScreen = forwardRef<MapScreenHandle, Props>(function MapScreen(
           }
         }}
       >
-        {/* Route fetcher — invisible, only used for coordinates */}
-        {pickUp && dropOff && (
-          <MapViewDirections
-            origin={{latitude: pickUp.coords.lat, longitude: pickUp.coords.lng}}
-            destination={{
-              latitude: dropOff.coords.lat,
-              longitude: dropOff.coords.lng,
-            }}
-            apikey={GOOGLE_MAPS_API_KEY ?? ""}
-            strokeWidth={0}
-            strokeColor="transparent"
-            optimizeWaypoints
-            mode="DRIVING"
-            onReady={(result) => {
-              routeCoordinatesRef.current = result.coordinates;
-              setRouteCoordinates(result.coordinates);
-              if (!isAnimating && mapRef.current) {
-                performFitToCoordinates(result.coordinates);
-              }
-            }}
-          />
-        )}
-
         {/* Casing — dark, wide, sits underneath */}
         {routeCoordinates.length > 0 && (
           <Polyline

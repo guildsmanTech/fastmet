@@ -1,11 +1,11 @@
-import {useAppStore} from "@/store/useAppStore";
-import {ILoadVariant, IVehicleType} from "@/types/vehicle";
-import {formatDate} from "@/utils/helpers/date";
-import {Ionicons} from "@expo/vector-icons";
-import BottomSheet, {BottomSheetScrollView} from "@gorhom/bottom-sheet";
-import {Image} from "expo-image";
-import {router} from "expo-router";
-import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import { useAppStore } from "@/store/useAppStore";
+import { ILoadVariant, IVehicleType } from "@/types/vehicle";
+import { formatDate } from "@/utils/helpers/date";
+import { Ionicons } from "@expo/vector-icons";
+import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -15,10 +15,10 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, {FadeInDown} from "react-native-reanimated";
-import {useSafeAreaInsets} from "react-native-safe-area-context";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BookingTypeModal from "../modals/bookingTypeModal";
-import {VehicleInfoModal} from "../modals/vehicleInfoModal";
+import { VehicleInfoModal } from "../modals/vehicleInfoModal";
 import LocationInputs from "./LocationInputs";
 import SheetButton from "./SheetButton";
 
@@ -47,6 +47,9 @@ const BookSheet = ({
   const vehicleError = useAppStore((state) => state.vehicleError);
   const fetchVehicles = useAppStore((state) => state.fetchVehicles);
   const vehicleLoading = useAppStore((state) => state.vehicleLoading);
+
+  const services = useAppStore((state) => state.addedServices);
+  const toggleService = useAppStore((state) => state.toggleService);
 
   const fetchBookingTypes = useAppStore((state) => state.fetchBookingTypes);
   const bookingTypesError = useAppStore((state) => state.bookingTypesError);
@@ -108,11 +111,15 @@ const BookSheet = ({
       variant: vehicle.variants[0],
     });
 
+    if (services.some((s) => s.key === "toll_fee") && vehicle.key === "motorcycle") {
+      toggleService(services.find((s) => s.key === "toll_fee")!);
+    }
+
     if (vehicleScrollRef.current) {
       const screenWidth = Dimensions.get("window").width;
       const scrollPosition =
         index * vehicleItemWidth - screenWidth / 2 + vehicleItemWidth / 2 + 15;
-      vehicleScrollRef.current.scrollTo({x: scrollPosition, animated: true});
+      vehicleScrollRef.current.scrollTo({ x: scrollPosition, animated: true });
     }
   };
 
@@ -126,7 +133,7 @@ const BookSheet = ({
       const screenWidth = Dimensions.get("window").width;
       const scrollPosition =
         index * variantItemWidth - screenWidth / 2 + variantItemWidth / 2 + 50; // Adjust -20 to move left/right
-      variantScrollRef.current.scrollTo({x: scrollPosition, animated: true});
+      variantScrollRef.current.scrollTo({ x: scrollPosition, animated: true });
     }
   };
 
@@ -161,9 +168,9 @@ const BookSheet = ({
         snapPoints={snapPoints}
         onChange={handleSheetChange}
         enableDynamicSizing={false}
-        handleIndicatorStyle={{backgroundColor: "#FFA840"}}
+        handleIndicatorStyle={{ backgroundColor: "#FFA840" }}
         enableContentPanningGesture={false} // 👈 This is the key
-        containerStyle={{zIndex: 20}}
+        containerStyle={{ zIndex: 20 }}
       >
         <View className="flex-row justify-between items-center pb-5 pt-1.5 px-3">
           <Text className="text-lg font-bold">Booking Type</Text>
@@ -231,7 +238,7 @@ const BookSheet = ({
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{gap: 10}}
+                    contentContainerStyle={{ gap: 10 }}
                   >
                     {[1, 2, 3, 4].map((item) => (
                       <View key={item} className="gap-1 items-center">
@@ -263,30 +270,28 @@ const BookSheet = ({
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     className="py-2 w-full"
-                    contentContainerStyle={{gap: 10}}
+                    contentContainerStyle={{ gap: 10 }}
                   >
                     {vehicles.map((v, index) => (
                       <View key={v.key} className="relative gap-1 items-center">
                         <Pressable
-                          className={`items-center gap-3 px-4 py-2 rounded-lg ${
-                            selectedVehicle?.key === v.key
-                              ? "border-2 border-lightPrimary"
-                              : ""
-                          }`}
+                          className={`items-center gap-3 px-4 py-2 rounded-lg ${selectedVehicle?.key === v.key
+                            ? "border-2 border-lightPrimary"
+                            : ""
+                            }`}
                           onPress={() => handleVehicleSelect(v, index)}
                         >
                           <Text
-                            className={`text-xs text-gray-500 ${
-                              selectedVehicle?.key === v.key
-                                ? "font-semibold"
-                                : ""
-                            }`}
+                            className={`text-xs text-gray-500 ${selectedVehicle?.key === v.key
+                              ? "font-semibold"
+                              : ""
+                              }`}
                           >
                             {v.name}
                           </Text>
                           <Image
                             source={v.imageUrl}
-                            style={{height: 35, width: 45}}
+                            style={{ height: 35, width: 45 }}
                             contentFit="contain"
                           />
                         </Pressable>
@@ -305,7 +310,7 @@ const BookSheet = ({
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         className="px-2"
-                        contentContainerStyle={{gap: 8}}
+                        contentContainerStyle={{ gap: 8 }}
                       >
                         {activeVariants.map((variant, index) => {
                           const isSelected =
@@ -315,19 +320,17 @@ const BookSheet = ({
                           return (
                             <Pressable
                               key={variant.maxLoadKg}
-                              className={`px-5 py-3 rounded-xl ${
-                                isSelected ? "bg-lightPrimary" : "bg-gray-200"
-                              }`}
+                              className={`px-5 py-3 rounded-xl ${isSelected ? "bg-lightPrimary" : "bg-gray-200"
+                                }`}
                               onPress={() =>
                                 handleVariantSelect(variant, index)
                               }
                             >
                               <Text
-                                className={`text-sm ${
-                                  isSelected
-                                    ? "font-semibold text-white"
-                                    : "font-medium text-gray-700"
-                                }`}
+                                className={`text-sm ${isSelected
+                                  ? "font-semibold text-white"
+                                  : "font-medium text-gray-700"
+                                  }`}
                               >
                                 Max Load: {variant.maxLoadKg}kg
                               </Text>
