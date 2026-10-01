@@ -1,5 +1,4 @@
 import SheetButton from "@/components/maps/SheetButton";
-import TollWebViewModal from "@/components/modals/tollWebViewModal";
 import {
   drivingDistanceQueryKey,
   useDrivingDistance,
@@ -14,7 +13,7 @@ import {
 import {Ionicons} from "@expo/vector-icons";
 import {useQueryClient} from "@tanstack/react-query";
 import {router} from "expo-router";
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useEffect, useMemo} from "react";
 import {Platform, Pressable, ScrollView, Text, View} from "react-native";
 import Popover, {PopoverPlacement} from "react-native-popover-view";
 import {
@@ -172,9 +171,11 @@ const Services = () => {
         <Text className="mb-3 text-lg font-bold">Additional Services</Text>
         <View className="gap-3 mb-6">
           {selectedVehicle?.paidServices.map((service) => {
+            // Toll is selected on the book sheet (Choose Vehicle row)
+            if (service.key === "toll_fee") return null;
             // Hide extra helper service if booking type is pooling
             if (service.key === "extra_helper" && bookingType?.type === "pooling")
-              return;
+              return null;
 
             const addedService = addedServices.find(
               (s) => s.key === service.key,
@@ -222,8 +223,6 @@ export const ServiceCard = ({
     quantity: number,
   ) => void;
 }) => {
-  const [tollModalVisible, setTollModalVisible] = useState(false);
-  const isTollService = service.key === "toll_fee";
   const handleIncrement = () => {
     if (service.maxQuantity && quantity >= service.maxQuantity) return;
     updateServiceQuantity(service.key, service.price, quantity + 1);
@@ -238,133 +237,99 @@ export const ServiceCard = ({
   };
 
   return (
-    <>
-      <Pressable
-        onPress={() => toggleService(service)}
-        className={`flex-row items-center justify-between p-3 border rounded-lg ${
-          isSelected
-            ? "border-lightPrimary bg-orange-50"
-            : "border-gray-300 active:bg-gray-50"
-        }`}
-        disabled={!!(service.maxQuantity && quantity >= service.maxQuantity)}
-      >
-        <View className="flex-row items-center flex-1 gap-2 pr-3">
-          <View className="flex-1 gap-1">
-            <View className="flex-row items-center">
-              <Text className="text-sm font-semibold">{service.name} </Text>
-              <Popover
-                placement={PopoverPlacement.AUTO}
-                from={
-                  <Pressable className="p-1">
-                    <Ionicons
-                      name="information-circle-outline"
-                      size={20}
-                      color="#9CA3AF"
-                    />
-                  </Pressable>
-                }
-              >
-                <View className="px-3 py-2 bg-white rounded-lg">
-                  <Text className="text-sm text-gray-700 leading-relaxed">
-                    {service.desc}
-                  </Text>
-                </View>
-              </Popover>
-            </View>
-            <View className="flex-row items-center gap-2 flex-wrap">
-              {service.price > 0 ? (
-                <>
-                  <Text className="text-sm font-semibold text-darkPrimary">
-                    ₱{service.price}
-                  </Text>
-                  <Text className="text-xs text-gray-500">
-                    • {service.unit}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text className="text-xs font-medium text-blue-600">
-                    Actual Cost
-                  </Text>
-
-                  {isTollService && (
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setTollModalVisible(true);
-                      }}
-                      hitSlop={8}
-                      className="flex-row items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 active:bg-blue-100"
-                    >
-                      <Ionicons
-                        name="receipt-outline"
-                        size={12}
-                        color="#1D4ED8"
-                      />
-                      <Text className="text-xs font-medium text-blue-700">
-                        Toll rates
-                      </Text>
-                    </Pressable>
-                  )}
-                </>
-              )}
-            </View>
+    <Pressable
+      onPress={() => toggleService(service)}
+      className={`flex-row items-center justify-between p-3 border rounded-lg ${
+        isSelected
+          ? "border-lightPrimary bg-orange-50"
+          : "border-gray-300 active:bg-gray-50"
+      }`}
+      disabled={!!(service.maxQuantity && quantity >= service.maxQuantity)}
+    >
+      <View className="flex-row items-center flex-1 gap-2 pr-3">
+        <View className="flex-1 gap-1">
+          <View className="flex-row items-center">
+            <Text className="text-sm font-semibold">{service.name} </Text>
+            <Popover
+              placement={PopoverPlacement.AUTO}
+              from={
+                <Pressable className="p-1">
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={20}
+                    color="#9CA3AF"
+                  />
+                </Pressable>
+              }
+            >
+              <View className="px-3 py-2 bg-white rounded-lg">
+                <Text className="text-sm text-gray-700 leading-relaxed">
+                  {service.desc}
+                </Text>
+              </View>
+            </Popover>
           </View>
-        </View>
-
-        {service.isQuantifiable ? (
-          // Quantifiable service - show quantity controls or checkbox
-          isSelected ? (
-            <View className="flex-row items-center gap-2">
-              <Pressable
-                onPress={handleDecrement}
-                className="items-center justify-center w-8 h-8 rounded-lg border border-lightPrimary active:bg-gray-100"
-                hitSlop={8}
-              >
-                <Ionicons name="remove" size={18} />
-              </Pressable>
-              <Text className="w-6 text-sm font-semibold text-center">
-                {quantity}
+          <View className="flex-row items-center gap-2 flex-wrap">
+            {service.price > 0 ? (
+              <>
+                <Text className="text-sm font-semibold text-darkPrimary">
+                  ₱{service.price}
+                </Text>
+                <Text className="text-xs text-gray-500">
+                  • {service.unit}
+                </Text>
+              </>
+            ) : (
+              <Text className="text-xs font-medium text-blue-600">
+                Actual Cost
               </Text>
-              <Pressable
-                onPress={handleIncrement}
-                className={`w-8 h-8 rounded-lg items-center bg-lightPrimary justify-center ${
-                  service.maxQuantity && quantity >= service.maxQuantity
-                    ? "opacity-50"
-                    : " active:bg-darkPrimary"
-                }`}
-                hitSlop={8}
-                disabled={
-                  !!(service.maxQuantity && quantity >= service.maxQuantity)
-                }
-              >
-                <Ionicons name="add" size={18} color="white" />
-              </Pressable>
-            </View>
-          ) : (
-            <View className="items-center justify-center w-6 h-6 bg-gray-300 rounded">
-              {/* Empty checkbox */}
-            </View>
-          )
-        ) : (
-          // Non-quantifiable service - simple checkbox
-          <View
-            className={`w-6 h-6 rounded items-center justify-center ${
-              isSelected ? "bg-lightPrimary" : "bg-gray-300"
-            }`}
-          >
-            {isSelected && (
-              <Ionicons name="checkmark" size={16} color="white" />
             )}
           </View>
-        )}
-      </Pressable>
-      {isTollService && (
-        <TollWebViewModal
-          visible={tollModalVisible}
-          onClose={() => setTollModalVisible(false)}
-        />
+        </View>
+      </View>
+
+      {service.isQuantifiable ? (
+        isSelected ? (
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={handleDecrement}
+              className="items-center justify-center w-8 h-8 rounded-lg border border-lightPrimary active:bg-gray-100"
+              hitSlop={8}
+            >
+              <Ionicons name="remove" size={18} />
+            </Pressable>
+            <Text className="w-6 text-sm font-semibold text-center">
+              {quantity}
+            </Text>
+            <Pressable
+              onPress={handleIncrement}
+              className={`w-8 h-8 rounded-lg items-center bg-lightPrimary justify-center ${
+                service.maxQuantity && quantity >= service.maxQuantity
+                  ? "opacity-50"
+                  : " active:bg-darkPrimary"
+              }`}
+              hitSlop={8}
+              disabled={
+                !!(service.maxQuantity && quantity >= service.maxQuantity)
+              }
+            >
+              <Ionicons name="add" size={18} color="white" />
+            </Pressable>
+          </View>
+        ) : (
+          <View className="items-center justify-center w-6 h-6 bg-gray-300 rounded" />
+        )
+      ) : (
+        <View
+          className={`w-6 h-6 rounded items-center justify-center ${
+            isSelected ? "bg-lightPrimary" : "bg-gray-300"
+          }`}
+        >
+          {isSelected && (
+            <Ionicons name="checkmark" size={16} color="white" />
+          )}
+        </View>
       )}
-    </>
+    </Pressable>
   );
 };

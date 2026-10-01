@@ -1,3 +1,4 @@
+import TollWebViewModal from "@/components/modals/tollWebViewModal";
 import { useAppStore } from "@/store/useAppStore";
 import { ILoadVariant, IVehicleType } from "@/types/vehicle";
 import { formatDate } from "@/utils/helpers/date";
@@ -15,6 +16,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Popover, { PopoverPlacement } from "react-native-popover-view";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BookingTypeModal from "../modals/bookingTypeModal";
@@ -39,6 +41,8 @@ const BookSheet = ({
   const insets = useSafeAreaInsets();
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [selectTimeModalVisible, setSelectTimeModalVisible] = useState(false);
+  const [tollModalVisible, setTollModalVisible] = useState(false);
+  const [tollPopoverVisible, setTollPopoverVisible] = useState(false);
 
   const bookingType = useAppStore((state) => state.bookingType);
   const selectedVehicle = useAppStore((state) => state.selectedVehicle);
@@ -76,6 +80,15 @@ const BookSheet = ({
   }, [selectedVehicleData]);
 
   const hasMultipleVariants = (selectedVehicleData?.variants?.length ?? 0) > 1;
+
+  const tollService = useMemo(
+    () =>
+      selectedVehicle?.paidServices?.find((s) => s.key === "toll_fee") ?? null,
+    [selectedVehicle],
+  );
+  const isTollSelected = services.some((s) => s.key === "toll_fee");
+  const showTollToggle =
+    !!tollService && selectedVehicle?.key !== "motorcycle";
 
   // to adjust the height of the sheet
   const snapPoints = useMemo(() => {
@@ -217,20 +230,101 @@ const BookSheet = ({
         <BottomSheetScrollView className="flex-1 px-3">
           <View className="gap-4 mb-40">
             <View className="gap-1 justify-center items-center">
-              <View className="flex-row gap-1 justify-center items-center self-start">
-                <Text className="text-sm font-semibold text-gray-900">
-                  Choose Vehicle
-                </Text>
-                <Pressable
-                  onPress={() => setInfoModalVisible(true)}
-                  hitSlop={20}
-                >
-                  <Ionicons
-                    name="information-circle"
-                    color="#FFA840"
-                    size={Platform.OS === "ios" ? 22 : 20}
-                  />
-                </Pressable>
+              <View className="flex-row items-center justify-between w-full gap-2">
+                <View className="flex-row gap-1 justify-center items-center shrink">
+                  <Text className="text-sm font-semibold text-gray-900">
+                    Choose Vehicle
+                  </Text>
+                  <Pressable
+                    onPress={() => setInfoModalVisible(true)}
+                    hitSlop={20}
+                  >
+                    <Ionicons
+                      name="information-circle"
+                      color="#FFA840"
+                      size={Platform.OS === "ios" ? 22 : 20}
+                    />
+                  </Pressable>
+                </View>
+
+                {showTollToggle && tollService && (
+                  <View className="flex-row items-center gap-1 shrink">
+                    <Pressable
+                      onPress={() => toggleService(tollService)}
+                      className={`flex-row items-center gap-1.5 px-2.5 py-1 rounded-lg border ${isTollSelected
+                        ? "border-lightPrimary bg-orange-50"
+                        : "border-gray-300 active:bg-gray-50"
+                        }`}
+                      hitSlop={4}
+                    >
+                      <Text
+                        className={`text-xs ${isTollSelected
+                          ? "font-semibold text-darkPrimary"
+                          : "font-medium text-gray-700"
+                          }`}
+                        numberOfLines={1}
+                      >
+                        {tollService.name}
+                      </Text>
+                      <View
+                        className={`w-4 h-4 rounded items-center justify-center ${isTollSelected ? "bg-lightPrimary" : "bg-gray-300"
+                          }`}
+                      >
+                        {isTollSelected && (
+                          <Ionicons name="checkmark" size={11} color="white" />
+                        )}
+                      </View>
+                    </Pressable>
+
+                    <Popover
+                      isVisible={tollPopoverVisible}
+                      onRequestClose={() => setTollPopoverVisible(false)}
+                      placement={PopoverPlacement.BOTTOM}
+                      from={
+                        <Pressable
+                          onPress={() => setTollPopoverVisible(true)}
+                          hitSlop={10}
+                          className="p-0.5"
+                        >
+                          <Ionicons
+                            name="information-circle-outline"
+                            size={18}
+                            color="#9CA3AF"
+                          />
+                        </Pressable>
+                      }
+                    >
+                      <View className="px-3 py-2.5 bg-white rounded-lg max-w-[240px] gap-2">
+                        <Text className="text-sm text-gray-700 leading-relaxed">
+                          {tollService.desc}
+                        </Text>
+                        <View className="flex-row items-center gap-1">
+
+                          <Text className="text-xs font-medium text-blue-600">
+                            Actual Cost
+                          </Text>
+                          <Pressable
+                            onPress={() => {
+                              setTollPopoverVisible(false);
+                              setTollModalVisible(true);
+                            }}
+                            hitSlop={8}
+                            className="flex-row self-start items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 active:bg-blue-100"
+                          >
+                            <Ionicons
+                              name="receipt-outline"
+                              size={12}
+                              color="#1D4ED8"
+                            />
+                            <Text className="text-xs font-medium text-blue-700">
+                              View toll rates
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    </Popover>
+                  </View>
+                )}
               </View>
 
               {vehicleLoading ? (
@@ -368,6 +462,11 @@ const BookSheet = ({
           onClose={() => setSelectTimeModalVisible(false)}
         />
       )}
+
+      <TollWebViewModal
+        visible={tollModalVisible}
+        onClose={() => setTollModalVisible(false)}
+      />
     </>
   );
 };

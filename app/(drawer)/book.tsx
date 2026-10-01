@@ -1,12 +1,20 @@
 import BookSheet from "@/components/maps/BookSheet";
 import MapScreen, { MapScreenHandle } from "@/components/maps/MapScreen";
 import SearchModal from "@/components/modals/mapSearchModal";
-import { useDrivingDistance } from "@/queries/bookingQueries";
+import {
+  drivingDistanceQueryKey,
+  useDrivingDistance,
+} from "@/queries/bookingQueries";
 import { useSurgeFactors } from "@/queries/pricingQueries";
 import { useAppStore } from "@/store/useAppStore";
-import { applyVehicleDuration, computeDistanceFee } from "@/utils/helpers/calculatePrice";
+import {
+  applyVehicleDuration,
+  computeDistanceFee,
+  fetchDrivingDistance,
+} from "@/utils/helpers/calculatePrice";
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerActions } from "@react-navigation/native";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigation } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
@@ -41,6 +49,7 @@ const Book = () => {
 
   const navigation = useNavigation();
   const mapScreenRef = useRef<MapScreenHandle>(null);
+  const queryClient = useQueryClient();
 
   const floatingButtonStyle = {
     shadowColor: "#000",
@@ -61,6 +70,17 @@ const Book = () => {
     dropOff,
     allowExpressway,
   );
+
+  // Prefetch expressway route so BookSheet toll toggle is a cache-hit
+  useEffect(() => {
+    if (!pickUp || !dropOff) return;
+
+    void queryClient.prefetchQuery({
+      queryKey: drivingDistanceQueryKey(pickUp, dropOff, true),
+      queryFn: () => fetchDrivingDistance(pickUp, dropOff, true),
+      staleTime: Infinity,
+    });
+  }, [pickUp, dropOff, queryClient]);
 
   // ── Surge + gas factors ───────────────────────────────────────────────────
   // Only fetches when pickUp is set — cached 60s, covers all variants at once
