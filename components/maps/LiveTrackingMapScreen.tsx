@@ -1,15 +1,15 @@
-import {useSocket} from "@/sockets/context/SocketProvider";
-import {useAppStore} from "@/store/useAppStore";
-import {useDriverLocationStore} from "@/store/useDriverLocationStore";
-import {BookingETAUpdatedPayload, Driver, LocationDetails} from "@/types/book";
-import {GOOGLE_MAPS_API_KEY, STATIC_IMAGES} from "@/utils/constants";
-import {useFocusEffect} from "expo-router";
-import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Image, StatusBar, StyleSheet, Text, View} from "react-native";
-import MapView, {LatLng, Marker, PROVIDER_GOOGLE} from "react-native-maps";
+import { useSocket } from "@/sockets/context/SocketProvider";
+import { useAppStore } from "@/store/useAppStore";
+import { useDriverLocationStore } from "@/store/useDriverLocationStore";
+import { BookingETAUpdatedPayload, Driver, LocationDetails } from "@/types/book";
+import { GOOGLE_MAPS_API_KEY, STATIC_IMAGES } from "@/utils/constants";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Image, StatusBar, StyleSheet, Text, View } from "react-native";
+import MapView, { LatLng, Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
-import {GasCategory, VehicleMarkerIcon} from "../VehicleMarkerIcon";
-import {DistanceBubble} from "./MapScreen";
+import { GasCategory, VehicleMarkerIcon } from "../VehicleMarkerIcon";
+import { DistanceBubble } from "./MapScreen";
 
 type Region = {
   latitude: number;
@@ -29,7 +29,7 @@ type Props = {
   status: string;
 };
 
-const MAP_EDGE_PADDING = {top: 80, right: 80, bottom: 80, left: 80};
+const MAP_EDGE_PADDING = { top: 80, right: 80, bottom: 80, left: 80 };
 const WRITE_THROTTLE_MS = 15000; // 15 seconds
 const LAST_SEEN_TICK_MS = 30000; // 30 seconds
 
@@ -53,7 +53,7 @@ export default function LiveTrackingMapScreen({
   const mapRef = useRef<MapView>(null);
   const routeCoordinatesRef = useRef<LatLng[]>([]);
   const lastPersistedWriteRef = useRef<number>(0);
-  const driverLocationRef = useRef<{lat: number; lng: number} | null>(null);
+  const driverLocationRef = useRef<{ lat: number; lng: number } | null>(null);
   const socket = useSocket();
   const getLiveEtaCache = useAppStore((state) => state.getLiveEtaCache);
   const setLiveEtaCache = useAppStore((state) => state.setLiveEtaCache);
@@ -140,7 +140,7 @@ export default function LiveTrackingMapScreen({
       if (!liveLocationReceivedThisSession) {
         const cached = getDriverLocationCache(bookingId);
         if (cached) {
-          const seeded = {lat: cached.lat, lng: cached.lng};
+          const seeded = { lat: cached.lat, lng: cached.lng };
           setDriverLocation(seeded);
           driverLocationRef.current = seeded;
           setIsLoadingDriverLocation(false);
@@ -150,13 +150,13 @@ export default function LiveTrackingMapScreen({
       }
 
       const handleDriverLocationResponse = (data: {
-        driverLoc: {lat: number; lng: number} | null;
+        driverLoc: { lat: number; lng: number } | null;
       }) => {
         if (isSubscribed && data.driverLoc) {
-          const {lat, lng} = data.driverLoc;
+          const { lat, lng } = data.driverLoc;
 
-          setDriverLocation({lat, lng});
-          driverLocationRef.current = {lat, lng};
+          setDriverLocation({ lat, lng });
+          driverLocationRef.current = { lat, lng };
           setLiveLocationReceivedThisSession(true);
           console.log("📍 Driver location received:", data.driverLoc);
 
@@ -164,11 +164,11 @@ export default function LiveTrackingMapScreen({
           const existingCache = getDriverLocationCache(bookingId);
 
           if (!existingCache) {
-            setDriverLocationCache(bookingId, {lat, lng, timestamp: now});
+            setDriverLocationCache(bookingId, { lat, lng, timestamp: now });
             lastPersistedWriteRef.current = now;
             console.log("💾 First cache write (immediate)");
           } else if (now - lastPersistedWriteRef.current >= WRITE_THROTTLE_MS) {
-            setDriverLocationCache(bookingId, {lat, lng, timestamp: now});
+            setDriverLocationCache(bookingId, { lat, lng, timestamp: now });
             lastPersistedWriteRef.current = now;
             console.log("💾 Throttled cache write");
           }
@@ -243,7 +243,7 @@ export default function LiveTrackingMapScreen({
       };
 
       socket.on("bookingETAUpdated", handleBookingETAUpdated);
-      socket.emit("requestBookingETA", {bookingId});
+      socket.emit("requestBookingETA", { bookingId });
 
       return () => {
         socket.off("bookingETAUpdated", handleBookingETAUpdated);
@@ -299,14 +299,14 @@ export default function LiveTrackingMapScreen({
                 longitude: pickUp.coords.lng,
               }}
               title="Pick Up"
-              anchor={{x: 0.5, y: 1}}
+              anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={tracksViewChanges}
               zIndex={1000}
             >
               <View>
                 <Image
                   source={STATIC_IMAGES.pickup}
-                  style={{width: 50, height: 50}}
+                  style={{ width: 50, height: 50 }}
                 />
               </View>
             </Marker>
@@ -320,11 +320,11 @@ export default function LiveTrackingMapScreen({
                 longitude: driverLocation.lng,
               }}
               title={driver.name ? `Driver - ${driver.name}` : "Your Driver"}
-              anchor={{x: 0.5, y: 0.5}}
+              anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={tracksViewChanges}
               zIndex={1000}
             >
-              <View style={{width: 40, height: 40, opacity: 1}}>
+              <View style={{ width: 40, height: 40, opacity: 1 }}>
                 <VehicleMarkerIcon gasCategory={gasCategory} size={50} />
               </View>
             </Marker>
@@ -338,14 +338,14 @@ export default function LiveTrackingMapScreen({
                 longitude: dropOff.coords.lng,
               }}
               title="Drop Off"
-              anchor={{x: 0.5, y: 1}}
+              anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={tracksViewChanges}
               zIndex={1001} // ← Higher than pickup
             >
               <View>
                 <Image
                   source={STATIC_IMAGES.dropoff}
-                  style={{width: 50, height: 50}}
+                  style={{ width: 50, height: 50 }}
                 />
               </View>
             </Marker>
@@ -362,13 +362,13 @@ export default function LiveTrackingMapScreen({
                 destination={
                   status === "picked_up"
                     ? {
-                        latitude: dropOff!.coords.lat,
-                        longitude: dropOff!.coords.lng,
-                      }
+                      latitude: dropOff!.coords.lat,
+                      longitude: dropOff!.coords.lng,
+                    }
                     : {
-                        latitude: pickUp!.coords.lat,
-                        longitude: pickUp!.coords.lng,
-                      }
+                      latitude: pickUp!.coords.lat,
+                      longitude: pickUp!.coords.lng,
+                    }
                 }
                 apikey={GOOGLE_MAPS_API_KEY ?? ""}
                 strokeWidth={5}
@@ -399,8 +399,8 @@ export default function LiveTrackingMapScreen({
             borderRadius: 20,
           }}
         >
-          <Text style={{color: "white", fontSize: 13, fontWeight: "600"}}>
-            Showing driver's last location: {lastSeenLabel}
+          <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>
+            Showing driver&apos;s last location: {lastSeenLabel}
           </Text>
         </View>
       )}
