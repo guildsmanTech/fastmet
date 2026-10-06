@@ -1,58 +1,106 @@
 import LiveTrackingMapScreen from "@/components/maps/LiveTrackingMapScreen";
 import StarDisplay from "@/components/StarDisplay";
-import {useBooking} from "@/queries/bookingQueries";
-import {useSocket} from "@/sockets/context/SocketProvider";
-import {useAppStore} from "@/store/useAppStore";
-import {createConversationId} from "@/utils/helpers/booking";
-import {Ionicons} from "@expo/vector-icons";
-import {Image} from "expo-image";
-import {router, useFocusEffect, useLocalSearchParams} from "expo-router";
-import React, {useCallback, useState} from "react";
+import { useBooking } from "@/queries/bookingQueries";
+import { useSocket } from "@/sockets/context/SocketProvider";
+import { useAppStore } from "@/store/useAppStore";
+import { createConversationId } from "@/utils/helpers/booking";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  InteractionManager,
   Linking,
   Platform,
   Pressable,
   Text,
   View,
 } from "react-native";
-import {Region} from "react-native-maps";
-import {SafeAreaView, useSafeAreaInsets} from "react-native-safe-area-context";
+import { Region } from "react-native-maps";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
+function normalizeParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
 
 export default function ViewOnMap() {
   const [region, setRegion] = useState<Region | null>(null);
-  const {bookingId, shouldGoBack} = useLocalSearchParams<{
-    bookingId: string;
-    shouldGoBack: string;
+  // Unmount the live map before navigating — replace while MapView is mounted
+  // is unreliable and can leave this screen stuck until the user presses back.
+  const [leavingToCompleted, setLeavingToCompleted] = useState(false);
+  const hasNavigatedRef = useRef(false);
+
+  const params = useLocalSearchParams<{
+    bookingId: string | string[];
+    shouldGoBack: string | string[];
   }>();
+  const bookingId = normalizeParam(params.bookingId);
+  const shouldGoBack = normalizeParam(params.shouldGoBack);
+
   const insets = useSafeAreaInsets();
   const socket = useSocket();
 
-  const {data: booking, isPending, error} = useBooking(bookingId);
+  const { data: booking, isPending, error } = useBooking(bookingId ?? "");
 
-  // Only leave the live map when this screen is focused and this booking completes
+  const leaveToCompleted = useCallback(() => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    // Drop MapView from the tree first; navigation runs in the effect below.
+    setLeavingToCompleted(true);
+  }, []);
+
+  // After MapView unmounts, land on the completed tab.
+  useEffect(() => {
+    if (!leavingToCompleted) return;
+
+    const task = InteractionManager.runAfterInteractions(() => {
+      router.replace("/(drawer)/(tabs)/request?tab=completed");
+    });
+
+    return () => task.cancel();
+  }, [leavingToCompleted]);
+
   useFocusEffect(
     useCallback(() => {
-      if (!socket || !bookingId) return;
+      if (!socket || !bookingId || leavingToCompleted) return;
 
       const handleBookingCompleted = ({
         bookingId: completedId,
       }: {
         bookingId: string;
       }) => {
-        if (completedId !== bookingId) return;
-        router.replace("/(drawer)/(tabs)/request?tab=completed");
+        if (String(completedId) !== String(bookingId)) return;
+        leaveToCompleted();
       };
 
       socket.on("bookingCompleted", handleBookingCompleted);
       return () => {
         socket.off("bookingCompleted", handleBookingCompleted);
       };
-    }, [bookingId, socket]),
+    }, [bookingId, socket, leaveToCompleted, leavingToCompleted]),
   );
 
-  if (isPending)
+  // Query fallback — global socket handler invalidates this booking; if status
+  // lands on completed (e.g. focus/listener edge cases), still leave the map.
+  useEffect(() => {
+    if (leavingToCompleted) return;
+    if (booking?.status === "completed") {
+      leaveToCompleted();
+    }
+  }, [booking?.status, leaveToCompleted, leavingToCompleted]);
+
+  if (leavingToCompleted) {
+    return (
+      <View className="flex-1 justify-center items-center bg-white">
+        <ActivityIndicator size="large" color="#FFA840" />
+      </View>
+    );
+  }
+
+  if (isPending || !bookingId)
     return (
       <View className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" color="#FFA840" />
@@ -76,7 +124,7 @@ export default function ViewOnMap() {
 
   return (
     <SafeAreaView
-      style={{flex: 1, backgroundColor: "white"}}
+      style={{ flex: 1, backgroundColor: "white" }}
       edges={["right", "bottom", "left"]}
     >
       <View className="relative flex-1">
@@ -94,7 +142,7 @@ export default function ViewOnMap() {
       <View className="absolute right-0 bottom-0 left-0">
         <View
           className="gap-3 justify-center px-5 py-6 w-full bg-white rounded-t-3xl"
-          style={{paddingBottom: insets.bottom + 15}}
+          style={{ paddingBottom: insets.bottom + 15 }}
         >
           <View className="flex-row justify-center items-center px-4">
             <Pressable
@@ -124,8 +172,8 @@ export default function ViewOnMap() {
                 {booking.driver.profilePictureUrl ? (
                   <Pressable className="w-[44px] h-[44px] rounded-full overflow-hidden">
                     <Image
-                      source={{uri: booking.driver.profilePictureUrl}}
-                      style={{width: "100%", height: "100%"}}
+                      source={{ uri: booking.driver.profilePictureUrl }}
+                      style={{ width: "100%", height: "100%" }}
                       contentFit="cover"
                     />
                   </Pressable>

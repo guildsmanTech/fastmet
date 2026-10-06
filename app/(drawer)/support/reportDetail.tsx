@@ -126,7 +126,16 @@ export default function ReportDetailScreen() {
         <View className="flex-1 px-5 py-3">
           {/* Header */}
           <View className="flex-row justify-between items-center mb-4">
-            <Pressable onPress={() => router.back()} className="p-2 -ml-2">
+            <Pressable
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace("/(drawer)/support");
+                }
+              }}
+              className="p-2 -ml-2"
+            >
               <Ionicons name="arrow-back" size={24} color="#111827" />
             </Pressable>
             <View

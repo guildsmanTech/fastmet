@@ -22,14 +22,18 @@ export default function SupportLayout() {
         name="fileReport"
         options={{
           title: "File Report",
-          headerTitle: ({children}) => <HeaderProfile title={children} />,
+          headerTitle: ({children}) => (
+            <HeaderProfile title={children} fallbackHref="/(drawer)/support" />
+          ),
         }}
       />
       <Stack.Screen
         name="reportDetail"
         options={{
           title: "Report Detail",
-          headerTitle: ({children}) => <HeaderProfile title={children} />,
+          headerTitle: ({children}) => (
+            <HeaderProfile title={children} fallbackHref="/(drawer)/support" />
+          ),
         }}
       />
     </Stack>

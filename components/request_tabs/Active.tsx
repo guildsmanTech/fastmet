@@ -1,16 +1,16 @@
 import CancelBookingButton from "@/components/CancelBookingButton";
-import {useBookingSettings} from "@/hooks/useBookingSettings";
+import { useBookingSettings } from "@/hooks/useBookingSettings";
 import useSeeMoreDetails from "@/hooks/useSeeMoreDetails";
-import {useUserBookings} from "@/queries/bookingQueries";
-import {useSocket} from "@/sockets/context/SocketProvider";
-import {useAppStore} from "@/store/useAppStore";
-import {ActiveBooking} from "@/types/book";
-import {createConversationId} from "@/utils/helpers/booking";
-import {formatLocation} from "@/utils/helpers/location";
-import {pushOnce} from "@/utils/helpers/navigation";
-import {Ionicons} from "@expo/vector-icons";
-import {Image} from "expo-image";
-import {useEffect} from "react";
+import { useUserBookings } from "@/queries/bookingQueries";
+import { useSocket } from "@/sockets/context/SocketProvider";
+import { useAppStore } from "@/store/useAppStore";
+import { ActiveBooking } from "@/types/book";
+import { createConversationId } from "@/utils/helpers/booking";
+import { formatLocation } from "@/utils/helpers/location";
+import { pushOnce } from "@/utils/helpers/navigation";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,7 +26,7 @@ import SeeMoreModalDisplay from "../modals/seeMoreModalDisplay";
 import StarDisplay from "../StarDisplay";
 
 export default function ActiveRoute() {
-  const {modalVisible, setModalVisible, selectedRequest, handleSeeMorePress} =
+  const { modalVisible, setModalVisible, selectedRequest, handleSeeMorePress } =
     useSeeMoreDetails<ActiveBooking>();
   const socket = useSocket();
 
@@ -117,7 +117,7 @@ export default function ActiveRoute() {
     <>
       <FlatList
         data={activeBookings}
-        renderItem={({item}) => (
+        renderItem={({ item }) => (
           <ActiveCard
             booking={item}
             onPressSeeMore={() => handleSeeMorePress(item)}
@@ -190,13 +190,13 @@ const ActiveCard = ({
   onPressSeeMore,
   onCancelled,
 }: ActiveCardProps) => {
-  const {driverNoShowMinutes} = useBookingSettings();
+  const { driverNoShowMinutes } = useBookingSettings();
   const {
     _id: id,
-    selectedVehicle: {name: vehicle, maxLoadKg = 0},
+    selectedVehicle: { name: vehicle, maxLoadKg = 0 },
     pickUp: pickup,
     dropOff: dropoff,
-    routeData: {distance, totalPrice: amount},
+    routeData: { distance, totalPrice: amount },
     paymentMethod,
     driver,
     bookingType,
@@ -226,7 +226,7 @@ const ActiveCard = ({
     <View
       style={{
         shadowColor: "#000",
-        shadowOffset: {width: 0, height: 4},
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 8,
@@ -249,7 +249,7 @@ const ActiveCard = ({
               onPress={() =>
                 pushOnce({
                   pathname: "/(root_screens)/booking/viewOnMap",
-                  params: {bookingId: id, shouldGoBack: "true"},
+                  params: { bookingId: id, shouldGoBack: "true" },
                 })
               }
             >
@@ -266,7 +266,7 @@ const ActiveCard = ({
                 Finding a replacement driver
               </Text>
               <Text className="mt-1 text-xs leading-5 text-amber-800">
-                No action needed. Your price stays the same. We will assi`gn a
+                No action needed. Your price stays the same. We will assign a
                 new driver automatically.
               </Text>
             </View>
@@ -281,8 +281,8 @@ const ActiveCard = ({
                 {driver.profilePictureUrl ? (
                   <View className="w-[44px] h-[44px] rounded-full overflow-hidden">
                     <Image
-                      source={{uri: driver.profilePictureUrl}}
-                      style={{width: "100%", height: "100%"}}
+                      source={{ uri: driver.profilePictureUrl }}
+                      style={{ width: "100%", height: "100%" }}
                       contentFit="cover"
                     />
                   </View>

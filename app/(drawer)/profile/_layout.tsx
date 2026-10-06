@@ -22,14 +22,18 @@ export default function ProfileLayout() {
         name="editProfile"
         options={{
           title: "Edit Profile",
-          headerTitle: ({ children }) => <HeaderProfile title={children} />,
+          headerTitle: ({ children }) => (
+            <HeaderProfile title={children} fallbackHref="/(drawer)/profile" />
+          ),
         }}
       />
       <Stack.Screen
         name="myDocument"
         options={{
           title: "My Documents",
-          headerTitle: ({ children }) => <HeaderProfile title={children} />,
+          headerTitle: ({ children }) => (
+            <HeaderProfile title={children} fallbackHref="/(drawer)/profile" />
+          ),
         }}
       />
     </Stack>

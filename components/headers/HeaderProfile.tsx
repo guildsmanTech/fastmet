@@ -1,14 +1,30 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import React from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 
-const HeaderProfile = ({ title }: { title: string }) => {
+const HeaderProfile = ({
+  title,
+  fallbackHref,
+}: {
+  title: string;
+  fallbackHref?: Href;
+}) => {
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    if (fallbackHref) {
+      router.replace(fallbackHref);
+    }
+  };
+
   return (
     <View className="flex-row items-center justify-center">
       <Pressable
         className={`absolute ${Platform.OS === "ios" ? "-top-2 -left-2" : "-top-1 left-0"}`}
-        onPress={() => router.back()}
+        onPress={handleBack}
         hitSlop={{ top: 30, left: 30, bottom: 30, right: 30 }}
       >
         <Ionicons

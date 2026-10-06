@@ -265,6 +265,7 @@ export default function DrawerLayout() {
         <Drawer.Screen
           name="profile"
           options={{
+            popToTopOnBlur: true,
             drawerLabel: "My Profile",
             title: "My Profile",
             // headerShown: true,
@@ -280,6 +281,7 @@ export default function DrawerLayout() {
         <Drawer.Screen
           name="support"
           options={{
+            popToTopOnBlur: true,
             drawerLabel: ({focused}) => (
               <View className="relative flex-row flex-1 justify-between items-center">
                 <Text
