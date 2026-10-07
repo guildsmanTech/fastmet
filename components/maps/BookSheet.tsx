@@ -28,12 +28,10 @@ const BookSheet = ({
   isDragging,
   onOpenSearch,
   toZoomOut,
-  isSurgeLoading,
 }: {
   isDragging: boolean;
   onOpenSearch: (type: "pickup" | "dropoff") => void;
   toZoomOut: () => void;
-  isSurgeLoading: boolean;
 }) => {
   const sheetRef = useRef<BottomSheet>(null);
   const previousSnapIndex = useRef<number>(1); // Store the previous index (default to 1, second snap point)
@@ -94,13 +92,13 @@ const BookSheet = ({
   const snapPoints = useMemo(() => {
     // Exact height in pixels rather than screen percentages
     const baseFirst = 170;
-    const baseSecond = 435;
+    const baseSecond = showTollToggle && tollService ? 475 : 435;
 
     const first = baseFirst + insets.bottom;
     const second = baseSecond + insets.bottom + (hasMultipleVariants ? 50 : 0);
 
     return [first, second];
-  }, [insets.bottom, hasMultipleVariants]);
+  }, [showTollToggle, tollService, insets.bottom, hasMultipleVariants]);
 
   const bookingTypeDisplay = useMemo(() => {
     if (!bookingType) return "Select option";
@@ -247,84 +245,7 @@ const BookSheet = ({
                   </Pressable>
                 </View>
 
-                {showTollToggle && tollService && (
-                  <View className="flex-row items-center gap-1 shrink">
-                    <Pressable
-                      onPress={() => toggleService(tollService)}
-                      className={`flex-row items-center gap-1.5 px-2.5 py-1 rounded-lg border ${isTollSelected
-                        ? "border-lightPrimary bg-orange-50"
-                        : "border-gray-300 active:bg-gray-50"
-                        }`}
-                      hitSlop={4}
-                    >
-                      <Text
-                        className={`text-xs ${isTollSelected
-                          ? "font-semibold text-darkPrimary"
-                          : "font-medium text-gray-700"
-                          }`}
-                        numberOfLines={1}
-                      >
-                        {tollService.name}
-                      </Text>
-                      <View
-                        className={`w-4 h-4 rounded items-center justify-center ${isTollSelected ? "bg-lightPrimary" : "bg-gray-300"
-                          }`}
-                      >
-                        {isTollSelected && (
-                          <Ionicons name="checkmark" size={11} color="white" />
-                        )}
-                      </View>
-                    </Pressable>
 
-                    <Popover
-                      isVisible={tollPopoverVisible}
-                      onRequestClose={() => setTollPopoverVisible(false)}
-                      placement={PopoverPlacement.BOTTOM}
-                      from={
-                        <Pressable
-                          onPress={() => setTollPopoverVisible(true)}
-                          hitSlop={10}
-                          className="p-0.5"
-                        >
-                          <Ionicons
-                            name="information-circle-outline"
-                            size={18}
-                            color="#9CA3AF"
-                          />
-                        </Pressable>
-                      }
-                    >
-                      <View className="px-3 py-2.5 bg-white rounded-lg max-w-[240px] gap-2">
-                        <Text className="text-sm text-gray-700 leading-relaxed">
-                          {tollService.desc}
-                        </Text>
-                        <View className="flex-row items-center gap-1">
-
-                          <Text className="text-xs font-medium text-blue-600">
-                            Actual Cost
-                          </Text>
-                          <Pressable
-                            onPress={() => {
-                              setTollPopoverVisible(false);
-                              setTollModalVisible(true);
-                            }}
-                            hitSlop={8}
-                            className="flex-row self-start items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 active:bg-blue-100"
-                          >
-                            <Ionicons
-                              name="receipt-outline"
-                              size={12}
-                              color="#1D4ED8"
-                            />
-                            <Text className="text-xs font-medium text-blue-700">
-                              View toll rates
-                            </Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    </Popover>
-                  </View>
-                )}
               </View>
 
               {vehicleLoading ? (
@@ -439,13 +360,93 @@ const BookSheet = ({
             </View>
 
             <LocationInputs onOpenSearch={onOpenSearch} />
+            {showTollToggle && tollService && (
+              <View className="flex-row items-center justify-between px-2">
+                <View className="flex-row items-center gap-1.5 flex-1">
+                  <Text
+                    className={`text-sm ${isTollSelected
+                      ? "font-semibold text-gray-900"
+                      : "font-medium text-gray-700"
+                      }`}
+                    numberOfLines={1}
+                  >
+                    {tollService.name}
+                  </Text>
+
+                  <Popover
+                    isVisible={tollPopoverVisible}
+                    onRequestClose={() => setTollPopoverVisible(false)}
+                    placement={PopoverPlacement.TOP}
+                    from={
+                      <Pressable
+                        onPress={() => setTollPopoverVisible(true)}
+                        hitSlop={10}
+                        className="p-0.5"
+                      >
+                        <Ionicons
+                          name="information-circle-outline"
+                          size={18}
+                          color="#9CA3AF"
+                        />
+                      </Pressable>
+                    }
+                  >
+                    <View className="px-3 py-2.5 bg-white rounded-lg max-w-[240px] gap-2">
+                      <Text className="text-sm text-gray-700 leading-relaxed">
+                        {tollService.desc}
+                      </Text>
+
+                      <View className="flex-row items-center gap-1">
+                        <Text className="text-xs font-medium text-blue-600">
+                          Actual Cost
+                        </Text>
+
+                        <Pressable
+                          onPress={() => {
+                            setTollPopoverVisible(false);
+                            setTollModalVisible(true);
+                          }}
+                          hitSlop={8}
+                          className="flex-row self-start items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 active:bg-blue-100"
+                        >
+                          <Ionicons
+                            name="receipt-outline"
+                            size={12}
+                            color="#1D4ED8"
+                          />
+                          <Text className="text-xs font-medium text-blue-700">
+                            View toll rates
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </Popover>
+                </View>
+
+                <Pressable
+                  onPress={() => toggleService(tollService)}
+                  hitSlop={8}
+                  className="ml-3"
+                >
+                  <View
+                    className={`w-5 h-5 rounded-md border items-center justify-center ${isTollSelected
+                      ? "bg-lightPrimary border-lightPrimary"
+                      : "bg-white border-gray-300"
+                      }`}
+                  >
+                    {isTollSelected && (
+                      <Ionicons name="checkmark" size={14} color="white" />
+                    )}
+                  </View>
+                </Pressable>
+              </View>
+            )}
           </View>
         </BottomSheetScrollView>
       </BottomSheet>
 
       <SheetButton
         next={() => router.push("/(root_screens)/booking/services")}
-        isSurgeLoading={isSurgeLoading}
       />
 
       {infoModalVisible && (

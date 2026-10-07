@@ -5,6 +5,7 @@ interface IPricingTier {
 }
 
 export interface ILoadVariant {
+  _id: string;
   maxLoadKg: number;
   baseFare: number;
   pricingTiers: IPricingTier[];

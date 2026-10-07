@@ -1,19 +1,10 @@
 import SheetButton from "@/components/maps/SheetButton";
-import {
-  drivingDistanceQueryKey,
-  useDrivingDistance,
-} from "@/queries/bookingQueries";
+import {useBookingQuote} from "@/hooks/useBookingQuote";
 import {useAppStore} from "@/store/useAppStore";
 import {Service} from "@/types/vehicle";
-import {
-  applyVehicleDuration,
-  computeDistanceFee,
-  fetchDrivingDistance,
-} from "@/utils/helpers/calculatePrice";
 import {Ionicons} from "@expo/vector-icons";
-import {useQueryClient} from "@tanstack/react-query";
 import {router} from "expo-router";
-import React, {useEffect, useMemo} from "react";
+import React from "react";
 import {Platform, Pressable, ScrollView, Text, View} from "react-native";
 import Popover, {PopoverPlacement} from "react-native-popover-view";
 import {
@@ -23,9 +14,6 @@ import {
 
 const Services = () => {
   const insets = useSafeAreaInsets();
-  const queryClient = useQueryClient();
-  const pickUp = useAppStore((state) => state.pickUp);
-  const dropOff = useAppStore((state) => state.dropOff);
   const addedServices = useAppStore((state) => state.addedServices);
   const toggleService = useAppStore((state) => state.toggleService);
   const updateServiceQuantity = useAppStore(
@@ -33,65 +21,9 @@ const Services = () => {
   );
   const selectedVehicle = useAppStore((state) => state.selectedVehicle);
   const bookingType = useAppStore((state) => state.bookingType);
-  const setRouteData = useAppStore((state) => state.setRouteData);
-  const setLoading = useAppStore((state) => state.setLoading);
 
-  const allowExpressway = useMemo(
-    () => addedServices.some((s) => s.key === "toll_fee"),
-    [addedServices],
-  );
-
-  const {data: route, isFetching} = useDrivingDistance(
-    pickUp,
-    dropOff,
-    allowExpressway,
-  );
-
-  // Prefetch expressway route once so first toll_fee toggle is cache-hit
-  useEffect(() => {
-    if (!pickUp || !dropOff) return;
-
-    void queryClient.prefetchQuery({
-      queryKey: drivingDistanceQueryKey(pickUp, dropOff, true),
-      queryFn: () => fetchDrivingDistance(pickUp, dropOff, true),
-      staleTime: Infinity,
-    });
-  }, [pickUp, dropOff, queryClient]);
-
-  // Reprice distance/duration when active route variant changes (cached after first fetch)
-  useEffect(() => {
-    if (!route || !selectedVehicle?.variant || !bookingType) return;
-
-    const {routeData, addedServices: services} = useAppStore.getState();
-    const distanceFee = computeDistanceFee(
-      route.distanceKm,
-      selectedVehicle.variant,
-      bookingType.priceModifier,
-    );
-    const serviceFee = services.reduce((sum, s) => sum + s.price, 0);
-    const {basePrice, surgeMultiplier = 1} = routeData;
-    const duration = applyVehicleDuration(
-      route.durationMin,
-      selectedVehicle.key,
-    );
-    const totalPrice = Math.round(
-      (basePrice + distanceFee + serviceFee) * surgeMultiplier,
-    );
-
-    setRouteData({
-      ...routeData,
-      distance: Math.round(route.distanceKm),
-      duration,
-      distanceFee,
-      serviceFee,
-      totalPrice,
-    });
-  }, [route, selectedVehicle, bookingType, setRouteData]);
-
-  useEffect(() => {
-    setLoading(isFetching);
-    return () => setLoading(false);
-  }, [isFetching, setLoading]);
+  // Server prices the booking (services included) and locks it in a quote.
+  useBookingQuote();
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: "white"}}>

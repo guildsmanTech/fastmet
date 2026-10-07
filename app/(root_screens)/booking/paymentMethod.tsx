@@ -1,5 +1,6 @@
 import VoucherPickerModal from "@/components/voucher/VoucherPickerModal";
 import {useAuth} from "@/hooks/useAuth";
+import {clearCachedQuotes, requestFreshQuote} from "@/hooks/useBookingQuote";
 import {queryClient} from "@/lib/queryClient";
 import {rewardKeys} from "@/queries/rewardQueries";
 import {useSocket} from "@/sockets/context/SocketProvider";
@@ -8,6 +9,7 @@ import {Booking, RequestBooking} from "@/types/book";
 import {IssuedReward} from "@/types/voucher";
 import {STATIC_IMAGES} from "@/utils/constants";
 import {generateBookingRef} from "@/utils/helpers/booking";
+import {isQuoteRedeemable} from "@/utils/helpers/quote";
 import {uploadBookingImages} from "@/utils/helpers/imagePicker";
 import {formatCurrency} from "@/utils/helpers/voucher";
 import {Ionicons} from "@expo/vector-icons";
@@ -15,7 +17,7 @@ import {InfiniteData} from "@tanstack/react-query";
 import {Image} from "expo-image";
 import {router, useFocusEffect} from "expo-router";
 import React, {useCallback, useEffect, useRef, useState} from "react";
-import {Platform, Pressable, Text, View} from "react-native";
+import {Alert, Platform, Pressable, Text, View} from "react-native";
 import {SafeAreaView, useSafeAreaInsets} from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
@@ -24,7 +26,8 @@ export default function PaymentMethod() {
   const paymentMethod = useAppStore((state) => state.paymentMethod);
   const isLoading = useAppStore((state) => state.isLoading);
 
-  const {bookingType, setPaymentMethod, routeData} = useAppStore.getState();
+  const routeData = useAppStore((state) => state.routeData);
+  const {bookingType, setPaymentMethod} = useAppStore.getState();
   const [loading, setLoading] = useState(false);
 
   // Voucher state
@@ -145,6 +148,31 @@ export default function PaymentMethod() {
         return;
       }
 
+      // The price must be a fresh server-locked quote. If the one we hold is
+      // missing or about to expire, lock a new one first; when the price moved,
+      // stop here so the user sees the new total before confirming.
+      if (!isQuoteRedeemable(useAppStore.getState())) {
+        const previousTotal = useAppStore.getState().routeData.totalPrice;
+        const fresh = await requestFreshQuote();
+        const newTotal = fresh.routeData.totalPrice;
+
+        if (newTotal !== previousTotal) {
+          if (selectedVoucher) setSelectedVoucher(null);
+          setLoading(false);
+          isSubmittingRef.current = false;
+          Alert.alert(
+            "Price updated",
+            `Your total is now Php ${newTotal.toFixed(2)}.${selectedVoucher ? " Please re-apply your voucher." : ""} Tap Book Now to confirm.`,
+          );
+          return;
+        }
+      }
+
+      const lockedQuoteId = useAppStore.getState().quoteId;
+      if (!lockedQuoteId) {
+        throw new Error("We couldn't lock your price. Please try again.");
+      }
+
       lastBookingRefRef.current = bookingRef;
 
       // Upload images first
@@ -167,6 +195,7 @@ export default function PaymentMethod() {
       const payload: RequestBooking = {
         customerId: id!,
         bookingRef,
+        quoteId: lockedQuoteId,
         pickUp: pickUp,
         dropOff: dropOff,
         bookingType: bookingType,
@@ -176,22 +205,17 @@ export default function PaymentMethod() {
           variant: selectedVehicle.variant,
           searchConfig: selectedVehicle.searchConfig,
         },
-        routeData: routeData,
         paymentMethod: paymentMethod,
         paidBy: paidBy,
         addedServices: addedServices.map((service) => ({
           key: service.key,
-          name: service.name,
-          price: service.price,
-          quantity: service.quantity,
+          quantity: service.quantity ?? 1,
         })),
         photos: uploadResult.images, // Cloudinary URLs
         note: note.trim(),
         itemType: itemType,
         voucherRewardId: selectedVoucher?.reward._id, // Include voucher if selected
       };
-
-      console.log("📤 Sending booking request:", payload);
 
       // Send via socket
       if (bookingType.type === "asap") {
@@ -339,6 +363,7 @@ export default function PaymentMethod() {
         }
 
         state.clearStates();
+        clearCachedQuotes();
       }
     };
 
@@ -352,6 +377,7 @@ export default function PaymentMethod() {
   useEffect(() => {
     const handleBookingFailed = (data: {
       message: string;
+      code?: string;
       approvalStatus?: string;
       voucherError?: boolean;
     }) => {
@@ -359,6 +385,46 @@ export default function PaymentMethod() {
       setLoading(false);
       isSubmittingRef.current = false;
       lastBookingRefRef.current = null;
+
+      // The price lock was rejected (expired / inputs changed / missing):
+      // lock a fresh one and let the user review before booking again.
+      if (
+        data.code === "QUOTE_EXPIRED" ||
+        data.code === "QUOTE_MISMATCH" ||
+        data.code === "QUOTE_REQUIRED"
+      ) {
+        const previousTotal = useAppStore.getState().routeData.totalPrice;
+        clearCachedQuotes();
+        void requestFreshQuote()
+          .then((fresh) => {
+            const newTotal = fresh.routeData.totalPrice;
+            if (selectedVoucher && newTotal !== previousTotal) {
+              setSelectedVoucher(null);
+            }
+            Alert.alert(
+              "Price updated",
+              newTotal !== previousTotal
+                ? `Your total is now Php ${newTotal.toFixed(2)}. Tap Book Now to confirm.`
+                : "Your price was refreshed. Tap Book Now to continue.",
+            );
+          })
+          .catch((err) => {
+            Toast.show({
+              type: "error",
+              text1: "Couldn't refresh price",
+              text2: err instanceof Error ? err.message : data.message,
+              position: "top",
+              visibilityTime: 4000,
+            });
+          });
+        return;
+      }
+
+      // Quote already used / being used: drop it so the next try locks a new one.
+      if (data.code === "QUOTE_USED" || data.code === "QUOTE_IN_USE") {
+        clearCachedQuotes();
+        useAppStore.getState().resetQuote();
+      }
 
       // Handle voucher-specific errors
       if (data.voucherError && selectedVoucher) {

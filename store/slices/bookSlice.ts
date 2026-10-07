@@ -23,7 +23,15 @@ export interface BookSlice {
   dropOff: LocationDetails;
   bookingType: BookingType | null;
   selectedVehicle: SelectedVehicle | null;
+  /** Server-computed price breakdown (from the latest quote/estimate). */
   routeData: RouteData;
+  /** Price lock for the current inputs. Null for guests and while re-quoting. */
+  quoteId: string | null;
+  quoteExpiresAt: number | null;
+  /** Identity of the inputs `routeData`/`quoteId` were computed for. */
+  quoteKey: string | null;
+  quoteStatus: "idle" | "loading" | "ready" | "error";
+  quoteError: string | null;
   paymentMethod: "cash" | "gcash";
   paidBy: "sender" | "receiver";
   note: string;
@@ -51,7 +59,16 @@ export interface BookSlice {
   swapLocations: () => boolean;
   setBookingType: (payload: {type: Type; value: string}) => void;
   setSelectedVehicle: (vehicle: SelectedVehicle) => void;
-  setRouteData: (data: RouteData) => void;
+  setQuoteLoading: () => void;
+  setQuoteReady: (quote: {
+    key: string;
+    quoteId?: string;
+    expiresAt?: number;
+    routeData: RouteData;
+  }) => void;
+  setQuoteError: (message: string) => void;
+  /** Inputs incomplete: drop the price entirely. */
+  resetQuote: () => void;
   setNote: (note: string) => void;
   setItemType: (itemType: string | null) => void;
   setPaymentMethod: (method: "cash" | "gcash") => void;
@@ -60,10 +77,27 @@ export interface BookSlice {
   setPhoto: (photo: string) => void;
   removePhoto: (photo: string) => void;
 
-  // calculatePrice: () => Promise<number>;
-
   clearStates: () => void;
 }
+
+const EMPTY_ROUTE_DATA: RouteData = {
+  distance: 0,
+  duration: 0,
+  basePrice: 0,
+  distanceFee: 0,
+  serviceFee: 0,
+  totalPrice: 0,
+  surgeMultiplier: 1.0,
+  gasAdjFactor: 1.0,
+};
+
+const EMPTY_QUOTE = {
+  quoteId: null,
+  quoteExpiresAt: null,
+  quoteKey: null,
+  quoteStatus: "idle" as const,
+  quoteError: null,
+};
 
 export const createBookSlice: StateCreator<
   BookSlice & BookingTypeSlice & LoadingSlice, // gives get() visibility into bookingTypes
@@ -75,16 +109,8 @@ export const createBookSlice: StateCreator<
   dropOff: null,
   bookingType: null,
   selectedVehicle: null,
-  routeData: {
-    distance: 0,
-    duration: 0,
-    basePrice: 0,
-    distanceFee: 0,
-    serviceFee: 0,
-    totalPrice: 0,
-    surgeMultiplier: 1.0,
-    gasAdjFactor: 1.0,
-  },
+  routeData: EMPTY_ROUTE_DATA,
+  ...EMPTY_QUOTE,
   paymentMethod: "cash",
   paidBy: "sender",
   note: "",
@@ -92,45 +118,26 @@ export const createBookSlice: StateCreator<
   photos: [],
   addedServices: [],
 
+  // Prices are never computed here: changing services only changes the
+  // selection, and the quote hook asks the server for the new total.
   toggleService: (service: Service) =>
     set((state) => {
       const exists = state.addedServices.some((s) => s.key === service.key);
-      const updatedServices = exists
-        ? state.addedServices.filter((s) => s.key !== service.key)
-        : [...state.addedServices, service];
-
-      const serviceFee = updatedServices.reduce((sum, s) => sum + s.price, 0);
-      const {basePrice, distanceFee} = state.routeData;
-
       return {
-        addedServices: updatedServices,
-        routeData: {
-          ...state.routeData,
-          serviceFee,
-          totalPrice: Math.round(basePrice + distanceFee + serviceFee),
-        },
+        addedServices: exists
+          ? state.addedServices.filter((s) => s.key !== service.key)
+          : [...state.addedServices, service],
       };
     }),
 
   updateServiceQuantity: (serviceKey, originalPrice, quantity) =>
-    set((state) => {
-      const updatedServices = state.addedServices.map((service) =>
+    set((state) => ({
+      addedServices: state.addedServices.map((service) =>
         service.key === serviceKey
           ? {...service, quantity, price: originalPrice * quantity}
           : service,
-      );
-      const serviceFee = updatedServices.reduce((sum, s) => sum + s.price, 0);
-      const {basePrice, distanceFee} = state.routeData;
-
-      return {
-        addedServices: updatedServices,
-        routeData: {
-          ...state.routeData,
-          serviceFee,
-          totalPrice: Math.round(basePrice + distanceFee + serviceFee),
-        },
-      };
-    }),
+      ),
+    })),
 
   setPickUp: (details) => set({pickUp: details}),
   setPickUpAdditionalDetails: (additionalDetails) =>
@@ -202,7 +209,32 @@ export const createBookSlice: StateCreator<
   },
 
   setSelectedVehicle: (vehicle) => set({selectedVehicle: vehicle}),
-  setRouteData: (data) => set({routeData: data}),
+  setQuoteLoading: () =>
+    set({
+      quoteStatus: "loading",
+      quoteError: null,
+      // A quote for different inputs must never be redeemable.
+      quoteId: null,
+      quoteExpiresAt: null,
+    }),
+  setQuoteReady: ({key, quoteId, expiresAt, routeData}) =>
+    set({
+      routeData,
+      quoteKey: key,
+      quoteId: quoteId ?? null,
+      quoteExpiresAt: expiresAt ?? null,
+      quoteStatus: "ready",
+      quoteError: null,
+    }),
+  setQuoteError: (message) =>
+    set({
+      quoteStatus: "error",
+      quoteError: message,
+      quoteId: null,
+      quoteExpiresAt: null,
+      quoteKey: null,
+    }),
+  resetQuote: () => set({routeData: EMPTY_ROUTE_DATA, ...EMPTY_QUOTE}),
   setNote: (note) => set({note}),
   setItemType: (itemType) => set({itemType}),
   setPhoto: (photo) => set((state) => ({photos: [...state.photos, photo]})),
@@ -217,14 +249,8 @@ export const createBookSlice: StateCreator<
       dropOff: null,
       bookingType: deriveDefaultBookingType(state.bookingTypes),
       selectedVehicle: null,
-      routeData: {
-        distance: 0,
-        duration: 0,
-        basePrice: 0,
-        distanceFee: 0,
-        serviceFee: 0,
-        totalPrice: 0,
-      },
+      routeData: EMPTY_ROUTE_DATA,
+      ...EMPTY_QUOTE,
       note: "",
       itemType: null,
       photos: [],

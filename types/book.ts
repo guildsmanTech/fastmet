@@ -98,6 +98,8 @@ export type Driver = {
 export type RequestBooking = {
   customerId: string;
   bookingRef: string;
+  /** Price lock from POST /pricing/quote. The server prices the booking from it. */
+  quoteId: string;
   pickUp: LocationDetails;
   dropOff: LocationDetails;
   bookingType: BookingType;
@@ -107,10 +109,10 @@ export type RequestBooking = {
     variant: ILoadVariant | null;
     searchConfig: SearchConfig;
   };
-  routeData: RouteData;
   paymentMethod: "cash" | "gcash";
   paidBy: "sender" | "receiver";
-  addedServices: Partial<Service>[];
+  /** Only identifies what was chosen; the server prices services itself. */
+  addedServices: Pick<Service, "key" | "quantity">[];
   photos: string[];
   note: string;
   itemType: string | null;

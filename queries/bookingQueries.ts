@@ -4,9 +4,14 @@ import {
   getRecentBookings,
   getUserBookings,
 } from "@/api/book";
+import {fetchRoutePreview, isClientPricingError} from "@/api/pricing";
 import {LocationDetails} from "@/types/book";
-import {fetchDrivingDistance} from "@/utils/helpers/calculatePrice";
-import {useInfiniteQuery, useQuery} from "@tanstack/react-query";
+import {decodePolyline} from "@/utils/helpers/polyline";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQuery,
+} from "@tanstack/react-query";
 
 export const useUserBookings = (status: string, limit: number) => {
   return useInfiniteQuery({
@@ -32,14 +37,18 @@ export const useBookingCounts = () => {
   });
 };
 
-/** Vehicle-independent: same OD+avoid shares cache for price + polyline. */
-export const drivingDistanceQueryKey = (
+/**
+ * Route line for the map only (no price). The server caches it per
+ * origin/destination/toll, so a later price quote reuses the same lookup.
+ * Vehicle-independent, so changing vehicle or services never refetches it.
+ */
+export const routePreviewQueryKey = (
   pickUp: LocationDetails | null,
   dropOff: LocationDetails | null,
   allowExpressway: boolean,
 ) =>
   [
-    "drivingDistance",
+    "routePreview",
     pickUp?.coords.lat,
     pickUp?.coords.lng,
     dropOff?.coords.lat,
@@ -47,17 +56,27 @@ export const drivingDistanceQueryKey = (
     allowExpressway,
   ] as const;
 
-export const useDrivingDistance = (
+export const useRoutePreview = (
   pickUp: LocationDetails | null,
   dropOff: LocationDetails | null,
   allowExpressway = false,
 ) => {
   return useQuery({
-    queryKey: drivingDistanceQueryKey(pickUp, dropOff, allowExpressway),
-    queryFn: () => fetchDrivingDistance(pickUp!, dropOff!, allowExpressway),
+    queryKey: routePreviewQueryKey(pickUp, dropOff, allowExpressway),
+    queryFn: async () => {
+      const route = await fetchRoutePreview(
+        pickUp!.coords,
+        dropOff!.coords,
+        allowExpressway,
+      );
+      return {coordinates: decodePolyline(route.polyline)};
+    },
     enabled: !!pickUp && !!dropOff,
     staleTime: Infinity,
     gcTime: 1000 * 60 * 60,
+    // Keep the old line on screen while a toll toggle loads the new one.
+    placeholderData: keepPreviousData,
+    retry: (count, err) => count < 1 && !isClientPricingError(err),
   });
 };
 
