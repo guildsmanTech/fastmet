@@ -1,4 +1,5 @@
 import DriverDetailsModal from "@/components/modals/driverDetailsModal";
+import {getBookingById, getBookingOffers} from "@/api/book";
 import {queryClient} from "@/lib/queryClient";
 import {useSocket} from "@/sockets/context/SocketProvider";
 import {useAppStore} from "@/store/useAppStore";
@@ -17,6 +18,7 @@ import React, {memo, useCallback, useEffect, useRef, useState} from "react";
 import {
   Alert,
   Animated,
+  AppState,
   BackHandler,
   Easing,
   Platform,
@@ -61,6 +63,78 @@ export default function SearchingDriver() {
   );
 
   console.log("SearchingDriver");
+
+  const resyncBookingState = useCallback(async () => {
+    if (!bookingId) return;
+    try {
+      const [booking, offersRes] = await Promise.all([
+        getBookingById(bookingId),
+        getBookingOffers(bookingId),
+      ]);
+
+      if (booking.status === "active" || booking.status === "picked_up") {
+        setShouldPrevent(false);
+        router.replace({
+          pathname: "/(root_screens)/booking/viewOnMap",
+          params: {bookingId},
+        });
+        return;
+      }
+
+      if (booking.status === "cancelled" || booking.status === "completed") {
+        setShouldPrevent(false);
+        useAppStore.getState().clearStates();
+        router.replace("/(drawer)/book");
+        return;
+      }
+
+      if (booking.status === "pending" && isPooling) {
+        setWaitingForTripStart(true);
+      }
+
+      setDrivers(
+        (offersRes.offers ?? []).map((offer) => ({
+          ...offer,
+          bookingId,
+        })),
+      );
+    } catch {
+      // 404 = expired / deleted searching booking
+      setShouldPrevent(false);
+      useAppStore.getState().clearStates();
+      Toast.show({
+        type: "error",
+        text1: "Request Expired",
+        text2: "This booking is no longer available. Please try again.",
+        position: "top",
+        visibilityTime: 5_000,
+        topOffset: 50,
+      });
+      router.replace("/(drawer)/book");
+    }
+  }, [bookingId, isPooling]);
+
+  useEffect(() => {
+    void resyncBookingState();
+  }, [resyncBookingState]);
+
+  useEffect(() => {
+    const onAppState = (state: string) => {
+      if (state === "active") void resyncBookingState();
+    };
+    const sub = AppState.addEventListener("change", onAppState);
+    return () => sub.remove();
+  }, [resyncBookingState]);
+
+  useEffect(() => {
+    const onConnect = () => {
+      void resyncBookingState();
+    };
+    socket.on("connect", onConnect);
+    return () => {
+      socket.off("connect", onConnect);
+    };
+  }, [socket, resyncBookingState]);
 
   // 1. Prevent screen removal (for both platforms)
   usePreventRemove(shouldPrevent, () => null);
@@ -695,17 +769,22 @@ const DriverRow = memo(
     const translateX = useRef(new Animated.Value(-400)).current;
     const opacity = useRef(new Animated.Value(0)).current;
     const progressAnim = useRef(new Animated.Value(100)).current;
-    const remainingTimeRef = useRef(60_000); // Track remaining time
+    const initialRemainingMs =
+      typeof driver.remainingMs === "number" && driver.remainingMs > 0
+        ? driver.remainingMs
+        : 60_000;
+    const remainingTimeRef = useRef(initialRemainingMs);
     const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
     const startTimer = useCallback(
       (duration: number) => {
-        const currentProgress = (duration / 60_000) * 100;
+        const clamped = Math.max(0, Math.min(duration, 60_000));
+        const currentProgress = (clamped / 60_000) * 100;
         progressAnim.setValue(currentProgress);
 
         animationRef.current = Animated.timing(progressAnim, {
           toValue: 0,
-          duration: duration,
+          duration: clamped,
           useNativeDriver: false,
           easing: Easing.linear,
         });

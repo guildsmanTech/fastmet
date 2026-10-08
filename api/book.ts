@@ -1,5 +1,5 @@
 import api from "@/lib/axios";
-import {ActiveBooking, CompletedBooking} from "@/types/book";
+import {ActiveBooking, CompletedBooking, RequestedDriver} from "@/types/book";
 
 export const getUserBookings = async (
   status: string,
@@ -21,6 +21,18 @@ export const getBookingById = async (
   bookingId: string,
 ): Promise<ActiveBooking> => {
   const res = await api.get(`/booking/${bookingId}`);
+  return res.data;
+};
+
+export const getBookingOffers = async (
+  bookingId: string,
+): Promise<{
+  bookingId: string;
+  status: string;
+  bookingType?: string;
+  offers: RequestedDriver[];
+}> => {
+  const res = await api.get(`/booking/${bookingId}/offers`);
   return res.data;
 };
 

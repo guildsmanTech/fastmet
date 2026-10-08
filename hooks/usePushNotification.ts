@@ -7,15 +7,25 @@ import {
 import {handleNotificationEntry} from "@/utils/helpers/notificationRouting";
 import * as Notifications from "expo-notifications";
 import {useEffect, useRef, useState} from "react";
+import {AppState} from "react-native";
 import {useAuth} from "./useAuth";
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => {
+    const type = notification.request.content.data?.type as string | undefined;
+    const isForeground = AppState.currentState === "active";
+    // Socket already shows these offers while the app is open.
+    const suppressBanner =
+      isForeground &&
+      (type === "driver_offer" || type === "driver_offer_pooling");
+
+    return {
+      shouldPlaySound: !suppressBanner,
+      shouldSetBadge: true,
+      shouldShowBanner: !suppressBanner,
+      shouldShowList: true,
+    };
+  },
 });
 
 let coldStartResponse: Notifications.NotificationResponse | null = null;

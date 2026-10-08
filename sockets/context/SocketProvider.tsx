@@ -3,6 +3,7 @@ import {ensureFreshToken, performLogout} from "@/lib/axios";
 import {useAppStore} from "@/store/useAppStore";
 import {DefaultEventsMap} from "@socket.io/component-emitter";
 import React, {createContext, useContext, useEffect, useMemo} from "react";
+import {AppState} from "react-native";
 import Toast from "react-native-toast-message";
 import {Socket} from "socket.io-client";
 import {
@@ -41,6 +42,13 @@ export default function SocketProvider({
     if (!socket || !token) return;
 
     socket.connect();
+
+    const onAppState = (state: string) => {
+      if (state === "active" && !socket.connected) {
+        socket.connect();
+      }
+    };
+    const appStateSub = AppState.addEventListener("change", onAppState);
 
     let refreshAttempted = false;
 
@@ -88,6 +96,7 @@ export default function SocketProvider({
 
     return () => {
       socket.off("connect_error"); // Clean up the listener
+      appStateSub.remove();
       cleanupReceiveMessage();
       cleanupAcceptanceRequestedSchedule();
       cleanupCancelScheduleDriverOffer();

@@ -129,4 +129,6 @@ export type RequestedDriver = {
   profilePicture: string;
   bookingId?: string;
   isQueued?: boolean;
+  /** Milliseconds left on the offer timer (from server clock). */
+  remainingMs?: number;
 };
