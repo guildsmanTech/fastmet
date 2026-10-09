@@ -1,20 +1,19 @@
 import CustomKeyAvoidingView from "@/components/CustomKeyAvoid";
-import {Countdown} from "@/components/Timers";
-import {ACCOUNT_PENDING_DELETION_ROUTE} from "@/constants/routes";
-import {ApprovalStatus} from "@/store/slices/authSlice";
-import {useAppStore} from "@/store/useAppStore";
-import {UserAddress} from "@/types/user";
+import { Countdown } from "@/components/Timers";
+import { ApprovalStatus } from "@/store/slices/authSlice";
+import { useAppStore } from "@/store/useAppStore";
+import { UserAddress } from "@/types/user";
 import {
   handleSendOtpError,
   routeAuthGuardError,
 } from "@/utils/helpers/authGuardErrors";
-import {getDeviceId} from "@/utils/helpers/deviceId";
-import {formatPHNumber} from "@/utils/helpers/format";
-import {Ionicons} from "@expo/vector-icons";
+import { getDeviceId } from "@/utils/helpers/deviceId";
+import { formatPHNumber } from "@/utils/helpers/format";
+import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
-import {router} from "expo-router";
+import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, {useEffect, useRef, useState} from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +22,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import {SafeAreaView} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
 export const RESEND_TIMEOUT_SECONDS = 60;
@@ -42,7 +41,7 @@ type LoginResponse = {
     fullName: string;
     profilePictureUrl: string;
     address: UserAddress | null;
-    gender: "male" | "female" | "prefer_not";
+    gender?: "male" | "female";
     preRegistered: boolean;
     email: string | null;
     deletionStatus?: "active" | "pending_deletion" | "deleted";
@@ -149,7 +148,7 @@ export default function PhoneOTPScreen() {
             deviceId,
             phoneNumber: useAppStore.getState().phoneNumber ?? "",
           },
-          {onRetry: handleResendOtp},
+          { onRetry: handleResendOtp },
         )
       )
         return;
@@ -209,10 +208,10 @@ export default function PhoneOTPScreen() {
     try {
       const deviceId = await getDeviceId();
 
-      const {data} = await axios.post<LoginResponse>(
+      const { data } = await axios.post<LoginResponse>(
         `${process.env.EXPO_PUBLIC_BASE_URL}/api/client/auth/login`,
-        {deviceId},
-        {headers: {Authorization: `Bearer ${verifyToken}`}},
+        { deviceId },
+        { headers: { Authorization: `Bearer ${verifyToken}` } },
       );
 
       if (data.success) {
@@ -245,7 +244,7 @@ export default function PhoneOTPScreen() {
             topOffset: 50,
           });
           router.replace({
-            pathname: ACCOUNT_PENDING_DELETION_ROUTE,
+            pathname: "/(auth)/account-pending-deletion",
             params: {
               scheduledAt: data.client.deletionScheduledAt
                 ? String(data.client.deletionScheduledAt)
@@ -351,7 +350,7 @@ export default function PhoneOTPScreen() {
                 }
               },
             },
-            {text: "Cancel"},
+            { text: "Cancel" },
           ],
         );
       }
@@ -377,7 +376,7 @@ export default function PhoneOTPScreen() {
 
     let verifyToken: string;
     try {
-      const {data: otpData} = await axios.post<{
+      const { data: otpData } = await axios.post<{
         success: boolean;
         verifyToken: string;
       }>(`${process.env.EXPO_PUBLIC_BASE_URL}/api/auth/verify-otp`, {
@@ -406,7 +405,7 @@ export default function PhoneOTPScreen() {
             "Too Many Failed Attempts",
             "This code has been invalidated. Please request a new one.",
             [
-              {text: "Cancel", style: "cancel"},
+              { text: "Cancel", style: "cancel" },
               {
                 text: "Request New Code",
                 onPress: () => setIsLocked(false),
@@ -424,9 +423,9 @@ export default function PhoneOTPScreen() {
         const minutes = retryAfter ? Math.ceil(retryAfter / 60) : null;
         setError(
           errorMessage ??
-            (minutes
-              ? `Too many failed attempts. Try again in ${minutes} minute${minutes > 1 ? "s" : ""}.`
-              : "Too many attempts. Please try again later."),
+          (minutes
+            ? `Too many failed attempts. Try again in ${minutes} minute${minutes > 1 ? "s" : ""}.`
+            : "Too many attempts. Please try again later."),
         );
       } else {
         setError("Verification failed. Please try again.");
@@ -524,7 +523,7 @@ export default function PhoneOTPScreen() {
                 shadowColor: "#000",
                 shadowOpacity: 0.05,
                 shadowRadius: 4,
-                shadowOffset: {width: 0, height: 2},
+                shadowOffset: { width: 0, height: 2 },
                 elevation: 2,
               }}
             >

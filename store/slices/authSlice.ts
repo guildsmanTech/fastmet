@@ -14,7 +14,7 @@ export interface AuthSlice {
   email: string | null;
   token: string | null;
   refreshToken: string | null;
-  gender: "male" | "female" | "prefer_not" | null;
+  gender: "male" | "female" | null;
   address: UserAddress | null;
   profilePictureUrl: string;
   preRegistered: boolean;

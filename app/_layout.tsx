@@ -59,6 +59,10 @@ export default Sentry.wrap(function RootLayout() {
   const [preRegActive, setPreRegActive] = useState(false);
 
   const fetchPreRegStatus = async () => {
+    // TEMP: bypass pre-reg gate for sideloaded prod APK testing — restore after
+    // setPreRegActive(false);
+    // setPreRegStatus("loaded");
+    // return;
     setPreRegStatus("loading");
     try {
       const res = await fetch(

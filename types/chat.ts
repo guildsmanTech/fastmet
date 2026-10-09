@@ -28,7 +28,7 @@ export type MessageResponse = {
     lastName: string;
     profilePictureUrl?: string;
     phoneNumber: string;
-    gender: "male" | "female" | "prefer_not";
+    gender?: "male" | "female";
   };
 };
 

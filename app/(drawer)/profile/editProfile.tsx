@@ -421,7 +421,6 @@ const EditProfile = () => {
               data={[
                 {label: "Male", value: "male"},
                 {label: "Female", value: "female"},
-                {label: "Prefer not to say", value: "prefer_not"},
               ]}
               dropdownPosition="top"
               labelField="label"

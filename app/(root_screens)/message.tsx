@@ -528,15 +528,15 @@ const Message = () => {
               </Text>
               <View className="flex-row gap-1 items-center">
                 <Text className="text-xs ml-0.5 text-gray-300">Driver</Text>
-                {conversation?.driver.gender === "prefer_not" ? null : (
+                {conversation?.driver.gender ? (
                   <Ionicons
                     name={
-                      conversation?.driver.gender === "male" ? "male" : "female"
+                      conversation.driver.gender === "male" ? "male" : "female"
                     }
                     size={16}
                     color="#FFA840"
                   />
-                )}
+                ) : null}
               </View>
             </View>
           </View>

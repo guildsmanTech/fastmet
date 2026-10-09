@@ -26,7 +26,7 @@ type PersistedAuth = {
   approvalStatus: ApprovalStatus;
   name: string;
   profilePictureUrl: string;
-  gender: "male" | "female" | "prefer_not" | null;
+  gender: "male" | "female" | null;
   address: UserAddress;
   preRegistered: boolean;
   email: string | null;

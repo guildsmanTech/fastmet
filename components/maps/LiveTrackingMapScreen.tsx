@@ -391,7 +391,7 @@ export default function LiveTrackingMapScreen({
         <View
           style={{
             position: "absolute",
-            top: 60,
+            top: 75,
             alignSelf: "center",
             backgroundColor: "rgba(255, 152, 0, 0.95)",
             paddingHorizontal: 16,

@@ -1,3 +1,4 @@
+import { LocationDetails } from "@/types/book";
 import { formatLocation } from "@/utils/helpers/location";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -9,8 +10,8 @@ export const DeliveryRouteCard = ({
   pickUp, 
   dropOff 
 }: { 
-  pickUp?: Record<string, any>; 
-  dropOff?: Record<string, any> 
+  pickUp?: LocationDetails; 
+  dropOff?: LocationDetails; 
 }) => {
   if (!pickUp && !dropOff) return null;
 

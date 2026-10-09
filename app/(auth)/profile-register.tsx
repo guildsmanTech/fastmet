@@ -1,37 +1,36 @@
 import CustomKeyAvoidingView from "@/components/CustomKeyAvoid";
 import AddressInput from "@/components/inputs/AddressInput";
-import {useAllowedDomains} from "@/hooks/useAllowedDomains";
-import {useAuthGuard} from "@/hooks/useAuthGuard";
+import { useAllowedDomains } from "@/hooks/useAllowedDomains";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 import api from "@/lib/axios";
-import {ProfileSchema} from "@/schemas/authSchema";
-import {useAppStore} from "@/store/useAppStore";
-import {NewUser, UserAddress} from "@/types/user";
+import { ProfileSchema } from "@/schemas/authSchema";
+import { useAppStore } from "@/store/useAppStore";
+import { NewUser, UserAddress } from "@/types/user";
 import {
   allowedDomainsMessage,
   isAllowedEmailDomain,
 } from "@/utils/helpers/emailDomain";
-import {openGallery} from "@/utils/helpers/imagePicker";
-import {validateForm} from "@/utils/helpers/validateForm";
-import {Ionicons} from "@expo/vector-icons";
-import {Image} from "expo-image";
-import {router, type Href} from "expo-router";
-import React, {useCallback, useState} from "react";
-import {Alert, Platform, Pressable, Text, TextInput, View} from "react-native";
-import {Dropdown} from "react-native-element-dropdown";
-import {SafeAreaView, useSafeAreaInsets} from "react-native-safe-area-context";
+import { openGallery } from "@/utils/helpers/imagePicker";
+import { validateForm } from "@/utils/helpers/validateForm";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { router, type Href } from "expo-router";
+import React, { useCallback, useState } from "react";
+import { Alert, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { Dropdown } from "react-native-element-dropdown";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileRegistration() {
   const [form, setForm] = useState<NewUser>({
     fullName: "",
     address: null,
-    gender: "prefer_not",
+    gender: "",
     email: "",
     profilePictureUrl: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const {isAuthenticated} = useAuthGuard();
+  const { isAuthenticated } = useAuthGuard();
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
-  const inset = useSafeAreaInsets();
   const setLoading = useAppStore((state) => state.setLoading);
   const loading = useAppStore((state) => state.isLoading);
   const allowedDomains = useAllowedDomains();
@@ -41,15 +40,15 @@ export default function ProfileRegistration() {
     if (result && !result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       setSelectedAsset(asset);
-      setForm({...form, profilePictureUrl: asset.uri});
+      setForm({ ...form, profilePictureUrl: asset.uri });
     }
   };
   const onFormChange = (name: string, value: string) => {
-    setForm({...form, [name]: value});
+    setForm({ ...form, [name]: value });
   };
 
   const onAddressChange = useCallback((address: UserAddress) => {
-    setForm((prev) => ({...prev, address}));
+    setForm((prev) => ({ ...prev, address }));
   }, []);
 
   const onSubmit = async () => {
@@ -70,7 +69,7 @@ export default function ProfileRegistration() {
       !form.email?.trim() ||
       !isAllowedEmailDomain(form.email, allowedDomains)
     ) {
-      setErrors({email: allowedDomainsMessage(allowedDomains)});
+      setErrors({ email: allowedDomainsMessage(allowedDomains) });
       return;
     }
     setErrors({});
@@ -136,7 +135,7 @@ export default function ProfileRegistration() {
   };
 
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: "#fff"}}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       <CustomKeyAvoidingView>
         <View className="flex-1 gap-6 p-6">
           <View className="items-center gap-3">
@@ -147,14 +146,14 @@ export default function ProfileRegistration() {
               {form.profilePictureUrl ? (
                 <View className="items-center justify-center bg-gray-100 rounded-full size-36">
                   <Image
-                    source={{uri: form.profilePictureUrl}}
-                    style={{width: 120, height: 120, borderRadius: 999}}
+                    source={{ uri: form.profilePictureUrl }}
+                    style={{ width: 120, height: 120, borderRadius: 999 }}
                     contentFit="cover"
                   />
                   <Pressable
                     className="absolute right-0 p-1 bg-white rounded-full top-2"
                     onPress={() =>
-                      setForm((prev) => ({...prev, profilePictureUrl: ""}))
+                      setForm((prev) => ({ ...prev, profilePictureUrl: "" }))
                     }
                   >
                     <Ionicons name="close-outline" size={20} color="red" />
@@ -178,9 +177,8 @@ export default function ProfileRegistration() {
               onChangeText={(text) => onFormChange("fullName", text)}
               placeholder="Enter Name"
               placeholderTextColor="#9CA3AF"
-              className={`p-4 text-base bg-gray-100 rounded-lg ${
-                errors.fullName ? "border border-red-500" : ""
-              }`}
+              className={`p-4 text-base bg-gray-100 rounded-lg ${errors.fullName ? "border border-red-500" : ""
+                }`}
             />
             {errors.fullName && (
               <Text className="ml-2 text-xs text-red-500">
@@ -203,10 +201,9 @@ export default function ProfileRegistration() {
               onChangeText={(text) => onFormChange("email", text)}
               placeholder="name@gmail.com"
               placeholderTextColor="#9CA3AF"
-              className={`px-4 text-gray-800 bg-gray-50 border rounded-xl ${
-                errors.email ? "border-red-500" : "border-gray-200"
-              }`}
-              style={{height: Platform.OS === "ios" ? 48 : 46}}
+              className={`px-4 text-gray-800 bg-gray-50 border rounded-xl ${errors.email ? "border-red-500" : "border-gray-200"
+                }`}
+              style={{ height: Platform.OS === "ios" ? 48 : 46 }}
             />
 
             {errors.email ? (
@@ -225,10 +222,10 @@ export default function ProfileRegistration() {
             onChange={onAddressChange}
             error={
               errors.address ||
-              errors.street ||
-              errors.barangay ||
-              errors.city ||
-              errors.province
+                errors.street ||
+                errors.barangay ||
+                errors.city ||
+                errors.province
                 ? "All fields in address are required and must be valid."
                 : undefined
             }
@@ -247,12 +244,11 @@ export default function ProfileRegistration() {
                 paddingVertical: 14,
                 borderRadius: 10,
               }}
-              placeholderStyle={{color: "#9CA3AF"}}
-              selectedTextStyle={{color: "#111827"}}
+              placeholderStyle={{ color: "#9CA3AF" }}
+              selectedTextStyle={{ color: "#111827" }}
               data={[
-                {label: "Male", value: "male"},
-                {label: "Female", value: "female"},
-                {label: "Prefer not to say", value: "prefer_not"},
+                { label: "Male", value: "male" },
+                { label: "Female", value: "female" },
               ]}
               labelField="label"
               valueField="value"

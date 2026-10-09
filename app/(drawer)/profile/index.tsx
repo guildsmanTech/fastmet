@@ -68,7 +68,7 @@ export default function MyProfile() {
         <View className="items-center gap-1">
           <View className="flex-row items-center justify-center gap-1">
             <Text className="text-xl font-bold text-gray-800">{name}</Text>
-            {!gender || gender === "prefer_not" ? null : gender === "male" ? (
+            {!gender ? null : gender === "male" ? (
               <Ionicons name="male" size={20} color="#FFA840" />
             ) : (
               <Ionicons name="female" size={20} color="#FFA840" />
