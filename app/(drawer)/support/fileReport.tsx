@@ -8,8 +8,8 @@ import {formatLocation} from "@/utils/helpers/location";
 import {Ionicons} from "@expo/vector-icons";
 import {useQuery} from "@tanstack/react-query";
 import {Image} from "expo-image";
-import {router} from "expo-router";
-import React, {useState} from "react";
+import {router, useLocalSearchParams} from "expo-router";
+import React, {useEffect, useMemo, useState} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,6 +40,12 @@ const CATEGORY_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 export default function FileReportScreen() {
   const {width: screenWidth} = useWindowDimensions();
   const {reportWindowDays} = useBookingSettings();
+  const {bookingId: bookingIdParam} = useLocalSearchParams<{
+    bookingId?: string | string[];
+  }>();
+  const bookingId = Array.isArray(bookingIdParam)
+    ? bookingIdParam[0]
+    : bookingIdParam;
   const photoSlotSize =
     (screenWidth - 40 - PHOTO_GAP * (PHOTO_COLS - 1)) / PHOTO_COLS;
 
@@ -50,6 +56,8 @@ export default function FileReportScreen() {
     Array(MAX_PHOTOS).fill(null),
   );
   const [showBookingPicker, setShowBookingPicker] = useState(false);
+  /** Last bookingId param we applied — must update when navigating to a different booking. */
+  const [preselectedId, setPreselectedId] = useState<string | null>(null);
 
   // Fetch eligible bookings from backend (already filtered)
   const {
@@ -61,7 +69,63 @@ export default function FileReportScreen() {
     queryFn: reportAPI.getEligibleBookings,
   });
 
-  const eligibleBookings = eligibleBookingsData?.bookings || [];
+  const eligibleBookings = useMemo(
+    () => eligibleBookingsData?.bookings ?? [],
+    [eligibleBookingsData?.bookings],
+  );
+
+  // Pre-select booking when navigated with bookingId (e.g. from Completed/Cancelled)
+  useEffect(() => {
+    if (!bookingId || isLoadingBookings || !eligibleBookingsData) return;
+    if (preselectedId === bookingId) return;
+
+    const match = eligibleBookings.find(
+      (b) => String(b._id) === String(bookingId),
+    );
+    setPreselectedId(bookingId);
+
+    if (match) {
+      setSelectedBooking(match);
+      setSelectedCategory(null);
+      setDescription("");
+      setImages(Array(MAX_PHOTOS).fill(null));
+      setShowBookingPicker(false);
+      return;
+    }
+
+    Alert.alert(
+      "Unable to report",
+      `This booking is not eligible for reporting. Completed bookings and driver no-shows can be reported within ${reportWindowDays} days, and only if you haven't already filed a report.`,
+    );
+  }, [
+    bookingId,
+    preselectedId,
+    eligibleBookings,
+    eligibleBookingsData,
+    isLoadingBookings,
+    reportWindowDays,
+  ]);
+
+  // Drop selection if that booking was reported / removed from eligible list
+  useEffect(() => {
+    if (!eligibleBookingsData || isLoadingBookings || !selectedBooking) return;
+
+    const stillEligible = eligibleBookings.some(
+      (b) => String(b._id) === String(selectedBooking._id),
+    );
+    if (stillEligible) return;
+
+    setSelectedBooking(null);
+    setSelectedCategory(null);
+    setDescription("");
+    setImages(Array(MAX_PHOTOS).fill(null));
+    setShowBookingPicker(false);
+  }, [
+    eligibleBookings,
+    eligibleBookingsData,
+    isLoadingBookings,
+    selectedBooking,
+  ]);
 
   const availableCategories: CategoryOption[] =
     selectedBooking?.status === "cancelled" &&

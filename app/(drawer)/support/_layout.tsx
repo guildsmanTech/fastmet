@@ -1,10 +1,24 @@
 import HeaderDrawer from "@/components/headers/HeaderDrawer";
 import HeaderProfile from "@/components/headers/HeaderProfile";
+import {StackActions, useNavigation} from "@react-navigation/native";
 import {Stack} from "expo-router";
+import {useEffect} from "react";
 
 export default function SupportLayout() {
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const drawer = navigation.getParent();
+    if (!drawer) return;
+
+    return drawer.addListener("blur", () => {
+      navigation.dispatch(StackActions.popToTop());
+    });
+  }, [navigation]);
+
   return (
     <Stack
+      initialRouteName="index"
       screenOptions={{
         headerStyle: {backgroundColor: "#0F2535"},
         headerLeft: () => null,

@@ -12,6 +12,7 @@ import {useAppStore} from "@/store/useAppStore";
 import {hasProfile} from "@/utils/helpers/onboarding";
 import {Ionicons} from "@expo/vector-icons";
 import {DrawerContentScrollView, DrawerItem} from "@react-navigation/drawer";
+import {DrawerActions} from "@react-navigation/native";
 import {router, useFocusEffect} from "expo-router";
 import {Drawer} from "expo-router/drawer";
 import {useCallback, useEffect, useState} from "react";
@@ -37,6 +38,11 @@ const CustomDrawerContent = (props: any) => {
     }
     if (!hasProfile(registrationStep) && routeName === "profile") {
       router.replace("/(auth)/profile-register");
+      return;
+    }
+    if (routeName === "support") {
+      router.replace("/(drawer)/support");
+      navigation.dispatch(DrawerActions.closeDrawer());
       return;
     }
     navigation.navigate(routeName);

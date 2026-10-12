@@ -10,10 +10,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Dimensions,
+  LayoutChangeEvent,
   Platform,
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Popover, { PopoverPlacement } from "react-native-popover-view";
@@ -23,6 +25,9 @@ import BookingTypeModal from "../modals/bookingTypeModal";
 import { VehicleInfoModal } from "../modals/vehicleInfoModal";
 import LocationInputs from "./LocationInputs";
 import SheetButton from "./SheetButton";
+
+const HANDLE_H = 24;
+const BUTTON_SPACE = 105; // set to SheetButton's real height + its bottom margin
 
 const BookSheet = ({
   isDragging,
@@ -34,9 +39,19 @@ const BookSheet = ({
   toZoomOut: () => void;
 }) => {
   const sheetRef = useRef<BottomSheet>(null);
-  const previousSnapIndex = useRef<number>(1); // Store the previous index (default to 1, second snap point)
+  const previousSnapIndex = useRef<number>(1);
 
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const [headerH, setHeaderH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+
+  const onMeasure =
+    (set: React.Dispatch<React.SetStateAction<number>>) =>
+      (e: LayoutChangeEvent) => {
+        const h = Math.ceil(e.nativeEvent.layout.height);
+        set((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+      };
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const [selectTimeModalVisible, setSelectTimeModalVisible] = useState(false);
   const [tollModalVisible, setTollModalVisible] = useState(false);
@@ -88,17 +103,18 @@ const BookSheet = ({
   const showTollToggle =
     !!tollService && selectedVehicle?.key !== "motorcycle";
 
-  // to adjust the height of the sheet
   const snapPoints = useMemo(() => {
-    // Exact height in pixels rather than screen percentages
-    const baseFirst = 170;
-    const baseSecond = showTollToggle && tollService ? 475 : 435;
+    const first = 170 + insets.bottom;
 
-    const first = baseFirst + insets.bottom;
-    const second = baseSecond + insets.bottom + (hasMultipleVariants ? 50 : 0);
+    if (!headerH || !contentH) return [first, 435 + insets.bottom];
 
-    return [first, second];
-  }, [showTollToggle, tollService, insets.bottom, hasMultipleVariants]);
+    const measured =
+      HANDLE_H + headerH + contentH + BUTTON_SPACE + insets.bottom;
+    const maxSecond = windowHeight - insets.top - 80; // leave room for the map/top UI; tune the 80
+    const second = Math.min(measured, maxSecond);
+
+    return [first, Math.max(second, first + 50)];
+  }, [insets.bottom, insets.top, headerH, contentH, windowHeight]);
 
   const bookingTypeDisplay = useMemo(() => {
     if (!bookingType) return "Select option";
@@ -183,7 +199,10 @@ const BookSheet = ({
         enableContentPanningGesture={false} // 👈 This is the key
         containerStyle={{ zIndex: 20 }}
       >
-        <View className="flex-row justify-between items-center pb-5 pt-1.5 px-3">
+        <View
+          onLayout={onMeasure(setHeaderH)}
+          className="flex-row justify-between items-center pb-5 pt-1.5 px-3"
+        >
           <Text className="text-lg font-bold">Booking Type</Text>
 
           {bookingTypesLoading ? (
@@ -225,8 +244,11 @@ const BookSheet = ({
           )}
         </View>
 
-        <BottomSheetScrollView className="flex-1 px-3">
-          <View className="gap-4 mb-40">
+        <BottomSheetScrollView
+          className="flex-1 px-3"
+          contentContainerStyle={{ paddingBottom: BUTTON_SPACE }}
+        >
+          <View onLayout={onMeasure(setContentH)} className="gap-4">
             <View className="gap-1 justify-center items-center">
               <View className="flex-row items-center justify-between w-full gap-2">
                 <View className="flex-row gap-1 justify-center items-center shrink">

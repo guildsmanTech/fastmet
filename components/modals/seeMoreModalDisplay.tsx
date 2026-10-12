@@ -1,3 +1,4 @@
+import {useBookingSettings} from "@/hooks/useBookingSettings";
 import {useAppStore} from "@/store/useAppStore";
 import {ActiveBooking, Booking} from "@/types/book";
 import {
@@ -5,7 +6,7 @@ import {
   getBookingTimelineContext,
   getBookingTimelineItems,
 } from "@/utils/helpers/booking";
-import {formatDate} from "@/utils/helpers/date";
+import {formatDate, isWithinReportWindow} from "@/utils/helpers/date";
 import {Ionicons} from "@expo/vector-icons";
 import {Image} from "expo-image";
 import {router} from "expo-router";
@@ -31,6 +32,7 @@ import {
   SeeMoreHeader,
   SelectedServices,
 } from "../BookingSeeMoreInfo";
+import BookingReportAction from "../BookingReportAction";
 import ImageViewer from "../ImageViewer";
 import StarDisplay from "../StarDisplay";
 
@@ -54,8 +56,14 @@ export default function SeeMoreModalDisplay({
   onOpenDriverOffers?: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const {reportWindowDays} = useBookingSettings();
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
+  const canReport =
+    type === "Cancelled Booking" &&
+    !data.clientReport &&
+    data.cancellationReason === "no_show_driver" &&
+    isWithinReportWindow(data.cancelledAt, reportWindowDays);
 
   // Memoize calculations to prevent recalculation on every render
   const {totalServicesPrice, hasAddedServices, hasFreeServices} =
@@ -152,15 +160,13 @@ export default function SeeMoreModalDisplay({
           </View>
 
           {/* Driver Card */}
-          {isActiveBooking(data) &&
-            data.driver?.name &&
-            data.driver?.rating && (
+          {isActiveBooking(data) && data.driver?.name && (
               <View className="px-4 py-3">
                 <Text className="mb-1 text-sm font-semibold text-gray-500">
                   Driver
                 </Text>
                 <View className="flex-row justify-between items-center">
-                  <View className="flex-row gap-2 justify-center items-center">
+                  <View className="flex-row gap-2 justify-center items-center flex-1 mr-2">
                     {data.driver.profilePictureUrl ? (
                       <Pressable
                         className="w-[48px] h-[48px] rounded-full overflow-hidden"
@@ -182,7 +188,7 @@ export default function SeeMoreModalDisplay({
                         color="#F7931E"
                       />
                     )}
-                    <View>
+                    <View className="flex-1">
                       <Text className="text-lg font-semibold text-gray-800">
                         {data.driver.name}
                       </Text>
@@ -195,7 +201,7 @@ export default function SeeMoreModalDisplay({
                     </View>
                   </View>
 
-                  {data.status !== "cancelled" && (
+                  {data.status !== "cancelled" ? (
                     <View className="flex-row gap-5">
                       <Pressable
                         className="items-center active:scale-110"
@@ -240,6 +246,18 @@ export default function SeeMoreModalDisplay({
                         <Text className="text-sm text-gray-600">Call</Text>
                       </Pressable>
                     </View>
+                  ) : (
+                    <BookingReportAction
+                      canReport={canReport}
+                      reportStatus={data.clientReport?.status ?? null}
+                      onPressReport={() => {
+                        onClose();
+                        router.push({
+                          pathname: "/(drawer)/support/fileReport",
+                          params: {bookingId: data._id},
+                        });
+                      }}
+                    />
                   )}
                 </View>
               </View>
@@ -365,6 +383,7 @@ export default function SeeMoreModalDisplay({
               </Text>
             </Pressable>
           )}
+
         </ScrollView>
       </View>
       <ImageViewer

@@ -1,5 +1,6 @@
 import {reportAPI} from "@/api/reports";
 import {queryClient} from "@/lib/queryClient";
+import {Booking} from "@/types/book";
 import {ReportSubmission} from "@/types/report";
 import {useMutation} from "@tanstack/react-query";
 import {AxiosError} from "axios";
@@ -8,9 +9,48 @@ import Toast from "react-native-toast-message";
 export const useSubmitReportMutation = () =>
   useMutation({
     mutationFn: (data: ReportSubmission) => reportAPI.submit(data),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      queryClient.setQueryData(
+        ["eligibleBookings"],
+        (old: {bookings: Booking[]} | undefined) => {
+          if (!old?.bookings) return old;
+          return {
+            ...old,
+            bookings: old.bookings.filter(
+              (b) => String(b._id) !== String(variables.bookingId),
+            ),
+          };
+        },
+      );
+
+      // Flip Report → pending on completed/cancelled lists immediately
+      queryClient.setQueriesData(
+        {queryKey: ["userBookings"]},
+        (old: {pages: {bookings: Booking[]}[]} | undefined) => {
+          if (!old?.pages) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              bookings: page.bookings.map((booking) =>
+                String(booking._id) === String(variables.bookingId)
+                  ? {
+                      ...booking,
+                      clientReport: {
+                        status: "pending" as const,
+                        reportId: "",
+                      },
+                    }
+                  : booking,
+              ),
+            })),
+          };
+        },
+      );
+
       void queryClient.invalidateQueries({queryKey: ["reports"]});
       void queryClient.invalidateQueries({queryKey: ["eligibleBookings"]});
+      void queryClient.invalidateQueries({queryKey: ["userBookings"]});
 
       Toast.show({
         type: "success",

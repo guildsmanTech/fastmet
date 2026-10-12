@@ -70,6 +70,11 @@ export type Booking = {
     voucherTemplateId: string;
     discountAmount: number;
   } | null;
+  /** Set on completed/cancelled lists when this client already filed a report. */
+  clientReport?: {
+    status: "pending" | "resolved" | "dismissed";
+    reportId: string;
+  } | null;
 };
 
 export type ActiveBooking = Booking & {driver: Driver};

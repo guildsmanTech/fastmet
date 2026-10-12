@@ -3,6 +3,17 @@ export const isDateString = (value: string): boolean => {
   return !isNaN(date.getTime());
 };
 
+/** True if `date` is within the last `days` (inclusive of the window). */
+export function isWithinReportWindow(
+  date: string | Date | null | undefined,
+  days: number,
+): boolean {
+  if (!date || days <= 0) return false;
+  const then = new Date(date).getTime();
+  if (Number.isNaN(then)) return false;
+  return Date.now() - then <= days * 24 * 60 * 60 * 1000;
+}
+
 export function formatDate(dateString: string) {
   const date = new Date(dateString);
 

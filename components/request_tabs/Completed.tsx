@@ -1,15 +1,18 @@
+import { useBookingSettings } from "@/hooks/useBookingSettings";
 import useSeeMoreDetails from "@/hooks/useSeeMoreDetails";
 import {
   useMarkAsReadMutation,
   useRateDriverMutation,
 } from "@/mutations/booking";
-import {useUserBookings} from "@/queries/bookingQueries";
-import {CompletedBooking, LocationDetails} from "@/types/book";
-import {getBookingTimelineItems} from "@/utils/helpers/booking";
-import {formatLocation} from "@/utils/helpers/location";
-import {Ionicons} from "@expo/vector-icons";
-import {Image} from "expo-image";
-import {useEffect, useMemo, useState} from "react";
+import { useUserBookings } from "@/queries/bookingQueries";
+import { CompletedBooking, Driver, LocationDetails } from "@/types/book";
+import { getBookingTimelineItems } from "@/utils/helpers/booking";
+import { isWithinReportWindow } from "@/utils/helpers/date";
+import { formatLocation } from "@/utils/helpers/location";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -20,7 +23,7 @@ import {
   Text,
   View,
 } from "react-native";
-import {useSafeAreaInsets} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   AttachedImages,
   BookingTimeline,
@@ -31,12 +34,14 @@ import {
   SeeMoreHeader,
   SelectedServices,
 } from "../BookingSeeMoreInfo";
+import BookingReportAction from "../BookingReportAction";
 import ImageViewer from "../ImageViewer";
 import StarDisplay from "../StarDisplay";
 
-export default function CompletedRoute({count}: {count: number}) {
-  const {modalVisible, setModalVisible, selectedRequest, handleSeeMorePress} =
+export default function CompletedRoute({ count }: { count: number }) {
+  const { modalVisible, setModalVisible, selectedRequest, handleSeeMorePress } =
     useSeeMoreDetails<CompletedBooking>();
+  const { reportWindowDays } = useBookingSettings();
 
   const {
     data,
@@ -48,7 +53,7 @@ export default function CompletedRoute({count}: {count: number}) {
     isFetchingNextPage,
   } = useUserBookings("completed", 5);
 
-  const {mutate: markAsReadBooking, isPending: isMarkingAsRead} =
+  const { mutate: markAsReadBooking, isPending: isMarkingAsRead } =
     useMarkAsReadMutation();
 
   useEffect(() => {
@@ -76,8 +81,9 @@ export default function CompletedRoute({count}: {count: number}) {
     <>
       <FlatList
         data={completedBookings}
-        renderItem={({item}) => (
+        renderItem={({ item }) => (
           <CompletedCard
+            driver={item.driver}
             vehicle={item.selectedVehicle.name}
             maxLoadKg={item.selectedVehicle.maxLoadKg ?? 0}
             bookingType={item.bookingType}
@@ -87,7 +93,18 @@ export default function CompletedRoute({count}: {count: number}) {
             amount={item.routeData.totalPrice}
             isCash={item.paymentMethod === "cash"}
             completedTime={item.completedAt}
+            reportStatus={item.clientReport?.status ?? null}
+            canReport={
+              !item.clientReport &&
+              isWithinReportWindow(item.completedAt, reportWindowDays)
+            }
             onPressSeeMore={() => handleSeeMorePress(item)}
+            onPressReport={() =>
+              router.push({
+                pathname: "/(drawer)/support/fileReport",
+                params: { bookingId: item._id },
+              })
+            }
           />
         )}
         keyExtractor={(item) => item._id}
@@ -157,7 +174,11 @@ type CompleteCardProps = {
   isCash: boolean;
   amount: number;
   completedTime: string;
+  canReport: boolean;
+  reportStatus?: "pending" | "resolved" | "dismissed" | null;
+  driver: Driver;
   onPressSeeMore: () => void;
+  onPressReport: () => void;
 };
 
 const CompletedCard = ({
@@ -169,7 +190,11 @@ const CompletedCard = ({
   distance,
   isCash,
   amount,
+  canReport,
+  reportStatus,
+  driver,
   onPressSeeMore,
+  onPressReport,
 }: CompleteCardProps) => {
   const formatted = new Date(completedTime).toLocaleString("en-US", {
     month: "short", // "Nov"
@@ -183,7 +208,7 @@ const CompletedCard = ({
     <View
       style={{
         shadowColor: "#000",
-        shadowOffset: {width: 0, height: 4},
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 8, // for Android
@@ -209,6 +234,44 @@ const CompletedCard = ({
             </View>
 
             <Text className="text-xs text-white/80 shrink-0">{formatted}</Text>
+          </View>
+        </View>
+
+        <View className="px-4 py-3">
+          <Text className="mb-1 text-sm font-semibold text-gray-500">
+            Driver
+          </Text>
+          <View className="flex-row justify-between items-center">
+            <View className="flex-row gap-2 justify-center items-center flex-1 mr-2">
+              {driver.profilePictureUrl ? (
+                <View className="w-[44px] h-[44px] rounded-full overflow-hidden">
+                  <Image
+                    source={{ uri: driver.profilePictureUrl }}
+                    style={{ width: "100%", height: "100%" }}
+                    contentFit="cover"
+                  />
+                </View>
+              ) : (
+                <Ionicons name="person-circle" size={50} color="#F7931E" />
+              )}
+              <View className="flex-1">
+                <Text className="text-lg font-semibold text-gray-800">
+                  {driver.name}
+                </Text>
+                <View className="flex-row gap-2 items-center">
+                  <StarDisplay rating={driver.rating} />
+                  <Text className="text-sm font-semibold text-gray-600">
+                    ({driver.rating})
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <BookingReportAction
+              canReport={canReport}
+              reportStatus={reportStatus}
+              onPressReport={onPressReport}
+            />
           </View>
         </View>
 
@@ -275,12 +338,16 @@ function SeeMoreModal({
   isAccepted: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const { reportWindowDays } = useBookingSettings();
   const [isImageViewVisible, setIsImageViewVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [userRating, setUserRating] = useState(0);
   const [showRatingCard, setShowRatingCard] = useState(false);
 
-  const {mutate, isPending, error} = useRateDriverMutation();
+  const canReport =
+    !data.clientReport &&
+    isWithinReportWindow(data.completedAt, reportWindowDays);
+  const { mutate, isPending, error } = useRateDriverMutation();
 
   const openImageViewer = (imageUrl: string) => {
     setSelectedImage(imageUrl);
@@ -290,7 +357,7 @@ function SeeMoreModal({
   const handleRateDriver = () => {
     if (userRating > 0) {
       mutate(
-        {bookingId: data._id, rating: userRating},
+        { bookingId: data._id, rating: userRating },
         {
           onSuccess: (data) => {
             setShowRatingCard(false);
@@ -312,7 +379,7 @@ function SeeMoreModal({
   }, [visible, data.driverRating]);
 
   // Memoize calculations to prevent recalculation on every render
-  const {totalServicesPrice, hasAddedServices, hasFreeServices} =
+  const { totalServicesPrice, hasAddedServices, hasFreeServices } =
     useMemo(() => {
       if (!data)
         return {
@@ -400,13 +467,13 @@ function SeeMoreModal({
           </View>
 
           {/* Driver Info */}
-          {data.driverRating !== null && (
+          {data.driver?.name && (
             <View className="px-4 py-3">
               <Text className="mb-1 text-sm font-semibold text-gray-500">
                 Driver
               </Text>
               <View className="flex-row justify-between items-center">
-                <View className="flex-row gap-2 justify-center items-center">
+                <View className="flex-row gap-2 justify-center items-center flex-1 mr-2">
                   {data.driver.profilePictureUrl ? (
                     <Pressable
                       className="w-[48px] h-[48px] rounded-full overflow-hidden"
@@ -415,15 +482,15 @@ function SeeMoreModal({
                       }
                     >
                       <Image
-                        source={{uri: data.driver.profilePictureUrl}}
-                        style={{width: "100%", height: "100%"}}
+                        source={{ uri: data.driver.profilePictureUrl }}
+                        style={{ width: "100%", height: "100%" }}
                         contentFit="cover"
                       />
                     </Pressable>
                   ) : (
                     <Ionicons name="person-circle" size={44} color="#F7931E" />
                   )}
-                  <View>
+                  <View className="flex-1">
                     <Text className="text-lg font-semibold text-gray-800">
                       {data.driver.name}
                     </Text>
@@ -436,16 +503,31 @@ function SeeMoreModal({
                   </View>
                 </View>
 
-                <View className="items-end">
-                  <Text className="mb-1 text-xs text-gray-500">
-                    Your Rating
-                  </Text>
-                  <View className="flex-row gap-1 items-center">
-                    <Ionicons name="star" size={16} color="#FFD700" />
-                    <Text className="text-sm font-semibold text-gray-800">
-                      {data.driverRating}
-                    </Text>
-                  </View>
+                <View className="flex-row gap-4 items-center">
+                  {data.driverRating !== null && (
+                    <View className="items-end">
+                      <Text className="mb-1 text-xs text-gray-500">
+                        Your Rating
+                      </Text>
+                      <View className="flex-row gap-1 items-center">
+                        <Ionicons name="star" size={16} color="#FFD700" />
+                        <Text className="text-sm font-semibold text-gray-800">
+                          {data.driverRating}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                  <BookingReportAction
+                    canReport={canReport}
+                    reportStatus={data.clientReport?.status ?? null}
+                    onPressReport={() => {
+                      onClose();
+                      router.push({
+                        pathname: "/(drawer)/support/fileReport",
+                        params: { bookingId: data._id },
+                      });
+                    }}
+                  />
                 </View>
               </View>
             </View>
@@ -517,7 +599,7 @@ function SeeMoreModal({
                         source={{
                           uri: data.bookingImages.pickup.beforeImageUrl,
                         }}
-                        style={{height: 90, width: "100%"}}
+                        style={{ height: 90, width: "100%" }}
                         contentFit="cover"
                       />
                       <View className="p-2">
@@ -539,7 +621,7 @@ function SeeMoreModal({
                         source={{
                           uri: data.bookingImages.pickup.afterImageUrl,
                         }}
-                        style={{height: 90, width: "100%"}}
+                        style={{ height: 90, width: "100%" }}
                         contentFit="cover"
                       />
                       <View className="p-2">
@@ -572,7 +654,7 @@ function SeeMoreModal({
                         source={{
                           uri: data.bookingImages.dropoff.signatureImageUrl,
                         }}
-                        style={{height: 90, width: "100%"}}
+                        style={{ height: 90, width: "100%" }}
                         contentFit="cover"
                       />
                       <View className="p-2">
@@ -596,7 +678,7 @@ function SeeMoreModal({
                         source={{
                           uri: data.bookingImages.dropoff.packageImageUrl,
                         }}
-                        style={{height: 90, width: "100%"}}
+                        style={{ height: 90, width: "100%" }}
                         contentFit="cover"
                       />
                       <View className="p-2">
@@ -633,6 +715,7 @@ function SeeMoreModal({
               setSelectedImageUrl={setSelectedImage}
             />
           )}
+
         </ScrollView>
 
         {/* Floating Rating Card */}
@@ -647,7 +730,7 @@ function SeeMoreModal({
               borderRadius: 16,
               padding: 16,
               shadowColor: "#000",
-              shadowOffset: {width: 0, height: -2},
+              shadowOffset: { width: 0, height: -2 },
               shadowOpacity: 0.1,
               shadowRadius: 8,
               elevation: 5,
@@ -659,7 +742,7 @@ function SeeMoreModal({
               </Text>
               <Pressable
                 onPress={() => setShowRatingCard(false)}
-                hitSlop={{top: 10, left: 10, bottom: 10, right: 10}}
+                hitSlop={{ top: 10, left: 10, bottom: 10, right: 10 }}
               >
                 <Ionicons name="close" size={24} color="#666" />
               </Pressable>
@@ -686,9 +769,8 @@ function SeeMoreModal({
             <Pressable
               onPress={handleRateDriver}
               disabled={userRating === 0 || isPending}
-              className={`py-3 rounded-xl ${
-                userRating > 0 ? "bg-lightPrimary" : "bg-gray-300"
-              }`}
+              className={`py-3 rounded-xl ${userRating > 0 ? "bg-lightPrimary" : "bg-gray-300"
+                }`}
             >
               <Text className="text-base font-semibold text-center text-white">
                 {isPending
@@ -708,7 +790,7 @@ function SeeMoreModal({
         )}
       </View>
       <ImageViewer
-        images={[{uri: selectedImage}]}
+        images={[{ uri: selectedImage }]}
         imageIndex={0}
         visible={isImageViewVisible}
         onRequestClose={() => setIsImageViewVisible(false)}

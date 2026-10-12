@@ -1,10 +1,13 @@
+import { useBookingSettings } from "@/hooks/useBookingSettings";
 import useSeeMoreDetails from "@/hooks/useSeeMoreDetails";
-import {useMarkAsReadMutation} from "@/mutations/booking";
-import {useUserBookings} from "@/queries/bookingQueries";
-import {Booking} from "@/types/book";
-import {formatDate} from "@/utils/helpers/date";
-import {Ionicons} from "@expo/vector-icons";
-import {useEffect} from "react";
+import { useMarkAsReadMutation } from "@/mutations/booking";
+import { useUserBookings } from "@/queries/bookingQueries";
+import { Booking, Driver } from "@/types/book";
+import { formatDate, isWithinReportWindow } from "@/utils/helpers/date";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { router } from "expo-router";
+import { useEffect } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -13,11 +16,14 @@ import {
   Text,
   View,
 } from "react-native";
+import BookingReportAction from "../BookingReportAction";
 import SeeMoreModalDisplay from "../modals/seeMoreModalDisplay";
+import StarDisplay from "../StarDisplay";
 
-export default function CancelledRoute({count}: {count: number}) {
-  const {modalVisible, setModalVisible, selectedRequest, handleSeeMorePress} =
+export default function CancelledRoute({ count }: { count: number }) {
+  const { modalVisible, setModalVisible, selectedRequest, handleSeeMorePress } =
     useSeeMoreDetails<Booking>();
+  const { reportWindowDays } = useBookingSettings();
 
   const {
     data,
@@ -29,7 +35,7 @@ export default function CancelledRoute({count}: {count: number}) {
     isFetchingNextPage,
   } = useUserBookings("cancelled", 5);
 
-  const {mutate: markAsReadBooking, isPending: isMarkingAsRead} =
+  const { mutate: markAsReadBooking, isPending: isMarkingAsRead } =
     useMarkAsReadMutation();
 
   useEffect(() => {
@@ -57,7 +63,7 @@ export default function CancelledRoute({count}: {count: number}) {
     <>
       <FlatList
         data={cancelledBookings}
-        renderItem={({item}) => (
+        renderItem={({ item }) => (
           <CancelledCard
             vehicle={item.selectedVehicle.name}
             maxLoadKg={item.selectedVehicle.maxLoadKg ?? 0}
@@ -67,7 +73,20 @@ export default function CancelledRoute({count}: {count: number}) {
             distance={item.routeData.distance}
             isCash={item.paymentMethod === "cash"}
             amount={item.routeData.totalPrice}
+            driver={item.driver}
             onPressSeeMore={() => handleSeeMorePress(item)}
+            onPressReport={() =>
+              router.push({
+                pathname: "/(drawer)/support/fileReport",
+                params: { bookingId: item._id },
+              })
+            }
+            reportStatus={item.clientReport?.status ?? null}
+            canReport={
+              !item.clientReport &&
+              item.cancellationReason === "no_show_driver" &&
+              isWithinReportWindow(item.cancelledAt, reportWindowDays)
+            }
             cancelledAt={item.cancelledAt!}
           />
         )}
@@ -136,7 +155,11 @@ type CancelledCardProps = {
   isCash: boolean;
   amount: number;
   cancelledAt: string;
+  driver?: Driver;
+  canReport: boolean;
+  reportStatus?: "pending" | "resolved" | "dismissed" | null;
   onPressSeeMore: () => void;
+  onPressReport: () => void;
 };
 
 const CancelledCard = ({
@@ -149,13 +172,17 @@ const CancelledCard = ({
   isCash,
   amount,
   cancelledAt,
+  driver,
+  canReport,
+  reportStatus,
   onPressSeeMore,
+  onPressReport,
 }: CancelledCardProps) => {
   return (
     <View
       style={{
         shadowColor: "#000",
-        shadowOffset: {width: 0, height: 4},
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 8, // for Android
@@ -169,12 +196,53 @@ const CancelledCard = ({
         {/* Header */}
         <View className="flex-row justify-between items-center px-5 py-3 bg-red-500">
           <Text
-            className={`font-semibold text-white ${maxLoadKg ? "text-base" : "text-lg"}`}
+            className={`font-semibold text-white ${maxLoadKg ? "text-sm" : "text-lg"}`}
           >
-            {vehicle} {maxLoadKg ? `(${maxLoadKg}kg)` : ""}
+            {vehicle}
+            {maxLoadKg ? ` · ${maxLoadKg}kg` : ""}
           </Text>
           <Text className="text-sm text-white">{bookingRef}</Text>
         </View>
+
+        {driver?.name && (
+          <View className="px-4 py-3">
+            <Text className="mb-1 text-sm font-semibold text-gray-500">
+              Driver
+            </Text>
+            <View className="flex-row justify-between items-center">
+              <View className="flex-row gap-2 justify-center items-center flex-1 mr-2">
+                {driver.profilePictureUrl ? (
+                  <View className="w-[44px] h-[44px] rounded-full overflow-hidden">
+                    <Image
+                      source={{ uri: driver.profilePictureUrl }}
+                      style={{ width: "100%", height: "100%" }}
+                      contentFit="cover"
+                    />
+                  </View>
+                ) : (
+                  <Ionicons name="person-circle" size={50} color="#F7931E" />
+                )}
+                <View className="flex-1">
+                  <Text className="text-lg font-semibold text-gray-800">
+                    {driver.name}
+                  </Text>
+                  <View className="flex-row gap-2 items-center">
+                    <StarDisplay rating={driver.rating} />
+                    <Text className="text-sm font-semibold text-gray-600">
+                      ({driver.rating})
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <BookingReportAction
+                canReport={canReport}
+                reportStatus={reportStatus}
+                onPressReport={onPressReport}
+              />
+            </View>
+          </View>
+        )}
 
         {/* Body */}
         <View className="px-3 py-5">
