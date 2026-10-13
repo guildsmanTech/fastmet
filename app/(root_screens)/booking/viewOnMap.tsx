@@ -1,13 +1,17 @@
 import LiveTrackingMapScreen from "@/components/maps/LiveTrackingMapScreen";
 import StarDisplay from "@/components/StarDisplay";
 import { useBooking } from "@/queries/bookingQueries";
+import {
+  clearConversationUnreadInCache,
+  getConversationUnreadFromCache,
+} from "@/queries/conversation";
 import { useSocket } from "@/sockets/context/SocketProvider";
 import { useAppStore } from "@/store/useAppStore";
 import { createConversationId } from "@/utils/helpers/booking";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -44,6 +48,66 @@ export default function ViewOnMap() {
   const socket = useSocket();
 
   const { data: booking, isPending, error } = useBooking(bookingId ?? "");
+
+  const clientId = useAppStore((s) => s.id);
+  const activeConversationId = useMemo(() => {
+    const driverId = booking?.driver?.id;
+    if (!clientId || !driverId) return null;
+    return createConversationId(clientId, driverId);
+  }, [booking?.driver?.id, clientId]);
+
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  const clearActiveChatUnread = useCallback(() => {
+    setChatUnreadCount(0);
+    if (!activeConversationId) return;
+    clearConversationUnreadInCache(activeConversationId);
+  }, [activeConversationId]);
+
+  const openChat = useCallback(() => {
+    clearActiveChatUnread();
+    if (!activeConversationId) return;
+    router.push({
+      pathname: "/message",
+      params: { conversationId: activeConversationId },
+    });
+  }, [activeConversationId, clearActiveChatUnread]);
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      setChatUnreadCount(0);
+      return;
+    }
+    setChatUnreadCount(getConversationUnreadFromCache(activeConversationId));
+  }, [activeConversationId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!activeConversationId) return;
+      setChatUnreadCount(getConversationUnreadFromCache(activeConversationId));
+    }, [activeConversationId]),
+  );
+
+  useEffect(() => {
+    if (!activeConversationId || !socket) return;
+
+    const handleNewMessageBadge = ({
+      conversationId,
+    }: {
+      conversationId: string;
+    }) => {
+      if (conversationId !== activeConversationId) return;
+      const { isInMessageScreen, activeConversationId: viewingId } =
+        useAppStore.getState();
+      if (isInMessageScreen && viewingId === conversationId) return;
+      setChatUnreadCount((n) => n + 1);
+    };
+
+    socket.on("new_message_badge", handleNewMessageBadge);
+    return () => {
+      socket.off("new_message_badge", handleNewMessageBadge);
+    };
+  }, [socket, activeConversationId]);
 
   const leaveToCompleted = useCallback(() => {
     if (hasNavigatedRef.current) return;
@@ -197,23 +261,22 @@ export default function ViewOnMap() {
                 <Pressable
                   className="items-center active:scale-110"
                   hitSlop={20}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/message",
-                      params: {
-                        conversationId: createConversationId(
-                          useAppStore.getState().id!,
-                          booking.driver.id,
-                        ),
-                      },
-                    })
-                  }
+                  onPress={openChat}
                 >
-                  <Ionicons
-                    name="chatbubble-ellipses"
-                    size={28}
-                    color="#F7931E"
-                  />
+                  <View className="relative">
+                    <Ionicons
+                      name="chatbubble-ellipses"
+                      size={28}
+                      color="#F7931E"
+                    />
+                    {chatUnreadCount > 0 && (
+                      <View className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full bg-red-500">
+                        <Text className="text-[10px] font-bold text-white">
+                          {chatUnreadCount > 9 ? "9+" : chatUnreadCount}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <Text className="text-gray-600">Chat</Text>
                 </Pressable>
                 <Pressable

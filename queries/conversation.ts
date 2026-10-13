@@ -5,8 +5,53 @@ import {
   getConversationsByName,
 } from "@/api/conversation";
 import { useAuth } from "@/hooks/useAuth";
+import { queryClient } from "@/lib/queryClient";
 import { useAppStore } from "@/store/useAppStore";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { ConversationResponse } from "@/types/chat";
+import { InfiniteData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+
+type ConversationsPage = {
+  conversations: ConversationResponse[];
+  nextPage: number | null;
+};
+
+export const getConversationUnreadFromCache = (
+  conversationId: string,
+): number => {
+  const queries = queryClient.getQueriesData<InfiniteData<ConversationsPage>>({
+    queryKey: ["conversations"],
+  });
+
+  for (const [, data] of queries) {
+    for (const page of data?.pages ?? []) {
+      const found = page.conversations.find((c) => c._id === conversationId);
+      if (found) return found.unreadCount.client;
+    }
+  }
+  return 0;
+};
+
+export const clearConversationUnreadInCache = (
+  conversationId: string,
+): void => {
+  queryClient.setQueriesData<InfiniteData<ConversationsPage>>(
+    { queryKey: ["conversations"] },
+    (old) => {
+      if (!old?.pages?.length) return old;
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          conversations: page.conversations.map((c) =>
+            c._id === conversationId
+              ? { ...c, unreadCount: { ...c.unreadCount, client: 0 } }
+              : c,
+          ),
+        })),
+      };
+    },
+  );
+};
 
 export const useConversations = (limit: number) => {
   const { isLoggedIn } = useAuth();

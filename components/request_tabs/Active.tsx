@@ -2,6 +2,10 @@ import CancelBookingButton from "@/components/CancelBookingButton";
 import { useBookingSettings } from "@/hooks/useBookingSettings";
 import useSeeMoreDetails from "@/hooks/useSeeMoreDetails";
 import { useUserBookings } from "@/queries/bookingQueries";
+import {
+  clearConversationUnreadInCache,
+  useConversations,
+} from "@/queries/conversation";
 import { useSocket } from "@/sockets/context/SocketProvider";
 import { useAppStore } from "@/store/useAppStore";
 import { ActiveBooking } from "@/types/book";
@@ -10,7 +14,7 @@ import { formatLocation } from "@/utils/helpers/location";
 import { pushOnce } from "@/utils/helpers/navigation";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +43,18 @@ export default function ActiveRoute() {
     hasNextPage,
     isFetchingNextPage,
   } = useUserBookings("active", 5);
+
+  const { data: conversationsData } = useConversations(10);
+
+  const clientUnreadByConversationId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const conversation of conversationsData?.pages.flatMap(
+      (page) => page.conversations,
+    ) ?? []) {
+      map.set(conversation._id, conversation.unreadCount.client);
+    }
+    return map;
+  }, [conversationsData]);
 
   // Listen for booking cancellation events
   useEffect(() => {
@@ -122,6 +138,7 @@ export default function ActiveRoute() {
             booking={item}
             onPressSeeMore={() => handleSeeMorePress(item)}
             onCancelled={refetch}
+            clientUnreadByConversationId={clientUnreadByConversationId}
           />
         )}
         keyExtractor={(item) => item._id}
@@ -183,12 +200,14 @@ type ActiveCardProps = {
   booking: ActiveBooking;
   onPressSeeMore: () => void;
   onCancelled: () => void;
+  clientUnreadByConversationId: Map<string, number>;
 };
 
 const ActiveCard = ({
   booking,
   onPressSeeMore,
   onCancelled,
+  clientUnreadByConversationId,
 }: ActiveCardProps) => {
   const { driverNoShowMinutes } = useBookingSettings();
   const {
@@ -204,6 +223,24 @@ const ActiveCard = ({
   } = booking;
 
   const isCash = paymentMethod === "cash";
+
+  const clientId = useAppStore((s) => s.id);
+  const conversationId =
+    clientId && driver?.id
+      ? createConversationId(clientId, driver.id)
+      : null;
+  const hasUnreadDriverMessage =
+    !!conversationId &&
+    (clientUnreadByConversationId.get(conversationId) ?? 0) > 0;
+
+  const openChat = () => {
+    if (!conversationId) return;
+    clearConversationUnreadInCache(conversationId);
+    pushOnce({
+      pathname: "/message",
+      params: { conversationId },
+    });
+  };
 
   const getReferenceTime = (): Date | null => {
     if (bookingType.type === "schedule") {
@@ -306,23 +343,18 @@ const ActiveCard = ({
                 <Pressable
                   className="items-center active:scale-110"
                   hitSlop={20}
-                  onPress={() =>
-                    pushOnce({
-                      pathname: "/message",
-                      params: {
-                        conversationId: createConversationId(
-                          useAppStore.getState().id!,
-                          driver.id,
-                        ),
-                      },
-                    })
-                  }
+                  onPress={openChat}
                 >
-                  <Ionicons
-                    name="chatbubble-ellipses"
-                    size={Platform.OS === "ios" ? 28 : 24}
-                    color="#F7931E"
-                  />
+                  <View className="relative">
+                    <Ionicons
+                      name="chatbubble-ellipses"
+                      size={Platform.OS === "ios" ? 28 : 24}
+                      color="#F7931E"
+                    />
+                    {hasUnreadDriverMessage && (
+                      <View className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white" />
+                    )}
+                  </View>
                   <Text className="text-sm text-gray-600">Chat</Text>
                 </Pressable>
                 <Pressable
