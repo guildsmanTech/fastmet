@@ -188,7 +188,7 @@ export const DriverOfferContent = ({ data }: { data: Record<string, any> }) => {
                 </View>
               )}
               <View className="flex-1">
-                <Text className="text-base font-bold text-gray-900">
+                <Text className="text-base font-bold text-gray-900 capitalize">
                   {driver.driverName}
                 </Text>
                 {driver.driverRating && (
@@ -516,7 +516,7 @@ export const ScheduledAutoAssignedContent = ({
             </View>
           )}
           <View className="flex-1">
-            <Text className="text-lg font-bold text-gray-900">
+            <Text className="text-lg font-bold text-gray-900 capitalize">
               {driverName || "Driver"}
             </Text>
             {driverRating && (

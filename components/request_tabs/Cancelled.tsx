@@ -7,7 +7,7 @@ import { formatDate, isWithinReportWindow } from "@/utils/helpers/date";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -17,12 +17,14 @@ import {
   View,
 } from "react-native";
 import BookingReportAction from "../BookingReportAction";
+import DriverProfileSheet from "../modals/DriverProfileSheet";
 import SeeMoreModalDisplay from "../modals/seeMoreModalDisplay";
 import StarDisplay from "../StarDisplay";
 
 export default function CancelledRoute({ count }: { count: number }) {
   const { modalVisible, setModalVisible, selectedRequest, handleSeeMorePress } =
     useSeeMoreDetails<Booking>();
+  const [profileDriver, setProfileDriver] = useState<Driver | null>(null);
   const { reportWindowDays } = useBookingSettings();
 
   const {
@@ -139,8 +141,20 @@ export default function CancelledRoute({ count }: { count: number }) {
           onClose={() => setModalVisible(false)}
           type="Cancelled Booking"
           data={selectedRequest}
+          onPressDriverProfile={
+            selectedRequest.cancellationReason === "no_show_driver" &&
+            selectedRequest.driver
+              ? () => setProfileDriver(selectedRequest.driver!)
+              : undefined
+          }
         />
       )}
+
+      <DriverProfileSheet
+        visible={profileDriver !== null}
+        driver={profileDriver}
+        onClose={() => setProfileDriver(null)}
+      />
     </>
   );
 }
@@ -223,7 +237,7 @@ const CancelledCard = ({
                   <Ionicons name="person-circle" size={50} color="#F7931E" />
                 )}
                 <View className="flex-1">
-                  <Text className="text-lg font-semibold text-gray-800">
+                  <Text className="text-lg font-semibold text-gray-800 capitalize">
                     {driver.name}
                   </Text>
                   <View className="flex-row gap-2 items-center">

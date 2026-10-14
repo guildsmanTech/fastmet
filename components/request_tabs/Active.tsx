@@ -8,13 +8,13 @@ import {
 } from "@/queries/conversation";
 import { useSocket } from "@/sockets/context/SocketProvider";
 import { useAppStore } from "@/store/useAppStore";
-import { ActiveBooking } from "@/types/book";
+import { ActiveBooking, Driver } from "@/types/book";
 import { createConversationId } from "@/utils/helpers/booking";
 import { formatLocation } from "@/utils/helpers/location";
 import { pushOnce } from "@/utils/helpers/navigation";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,12 +26,14 @@ import {
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
+import DriverProfileSheet from "../modals/DriverProfileSheet";
 import SeeMoreModalDisplay from "../modals/seeMoreModalDisplay";
 import StarDisplay from "../StarDisplay";
 
 export default function ActiveRoute() {
   const { modalVisible, setModalVisible, selectedRequest, handleSeeMorePress } =
     useSeeMoreDetails<ActiveBooking>();
+  const [profileDriver, setProfileDriver] = useState<Driver | null>(null);
   const socket = useSocket();
 
   const {
@@ -190,8 +192,15 @@ export default function ActiveRoute() {
           onClose={() => setModalVisible(false)}
           type="Active Booking"
           data={selectedRequest}
+          onPressDriverProfile={() => setProfileDriver(selectedRequest.driver)}
         />
       )}
+
+      <DriverProfileSheet
+        visible={profileDriver !== null}
+        driver={profileDriver}
+        onClose={() => setProfileDriver(null)}
+      />
     </>
   );
 }
@@ -327,7 +336,7 @@ const ActiveCard = ({
                   <Ionicons name="person-circle" size={50} color="#F7931E" />
                 )}
                 <View>
-                  <Text className="text-lg font-semibold text-gray-800">
+                  <Text className="text-lg font-semibold text-gray-800 capitalize">
                     {driver.name}
                   </Text>
                   <View className="flex-row gap-2 items-center">

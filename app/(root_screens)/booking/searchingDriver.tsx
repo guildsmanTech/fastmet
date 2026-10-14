@@ -903,7 +903,7 @@ const DriverRow = memo(
               )}
 
               <View>
-                <Text className="text-sm font-semibold text-gray-900">
+                <Text className="text-sm font-semibold text-gray-900 capitalize">
                   {driver.name}
                 </Text>
 

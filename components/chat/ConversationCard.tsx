@@ -1,26 +1,26 @@
-import { ConversationResponse } from "@/types/chat";
-import { formatLastMessageTime } from "@/utils/helpers/date";
-import { pushOnce } from "@/utils/helpers/navigation";
-import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
+import {ConversationResponse} from "@/types/chat";
+import {formatLastMessageTime} from "@/utils/helpers/date";
+import {pushOnce} from "@/utils/helpers/navigation";
+import {Ionicons} from "@expo/vector-icons";
+import {Image} from "expo-image";
 import React from "react";
-import { Pressable, Text, View } from "react-native";
+import {Pressable, Text, View} from "react-native";
 
-const ConversationCard = ({ item }: { item: ConversationResponse }) => {
+const ConversationCard = ({item}: {item: ConversationResponse}) => {
   return (
     <Pressable
       className="flex-row items-center gap-4 px-4 py-2 active:bg-ctaSecondary"
       onPress={() =>
         pushOnce({
           pathname: "/message",
-          params: { conversationId: item._id },
+          params: {conversationId: item._id},
         })
       }
     >
       {item.driver.profilePictureUrl ? (
         <Image
-          source={{ uri: item.driver.profilePictureUrl }}
-          style={{ width: 50, height: 50, borderRadius: 999 }}
+          source={{uri: item.driver.profilePictureUrl}}
+          style={{width: 50, height: 50, borderRadius: 999}}
           contentFit="cover"
         />
       ) : (
@@ -29,7 +29,7 @@ const ConversationCard = ({ item }: { item: ConversationResponse }) => {
       <View className="flex-1 gap-1">
         <View className="flex-row items-center justify-between">
           <Text
-            className={`font-bold max-w-[60%] ${item.unreadCount.client > 0 ? "font-bold" : ""}`}
+            className={`font-bold max-w-[70%] capitalize ${item.unreadCount.client > 0 ? "font-bold" : ""}`}
             numberOfLines={1}
           >
             {item.driver.firstName} {item.driver.lastName}

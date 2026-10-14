@@ -319,7 +319,11 @@ export default function LiveTrackingMapScreen({
                 latitude: driverLocation.lat,
                 longitude: driverLocation.lng,
               }}
-              title={driver.name ? `Driver - ${driver.name}` : "Your Driver"}
+              title={
+                driver.name
+                  ? `Driver - ${driver.name.replace(/\b\w/g, (c) => c.toUpperCase())}`
+                  : "Your Driver"
+              }
               anchor={{x: 0.5, y: 0.5}}
               tracksViewChanges={tracksViewChanges}
               zIndex={1000}

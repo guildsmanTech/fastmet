@@ -596,7 +596,7 @@ const RequestCard = ({
                   </View>
                 )}
                 <View className="flex-1 ml-3">
-                  <Text className="text-base font-semibold text-green-900">
+                  <Text className="text-base font-semibold text-green-900 capitalize">
                     {driver.name}
                   </Text>
                   <View className="flex-row items-center mt-1">
@@ -816,7 +816,7 @@ const DriversListModal = ({
                   )}
 
                   <View className="flex-1">
-                    <Text className="text-base font-semibold text-gray-900">
+                    <Text className="text-base font-semibold text-gray-900 capitalize">
                       {driver.name}
                     </Text>
                     <View className="flex-row gap-1 items-center mt-1">

@@ -36,11 +36,13 @@ import {
 } from "../BookingSeeMoreInfo";
 import BookingReportAction from "../BookingReportAction";
 import ImageViewer from "../ImageViewer";
+import DriverProfileSheet from "../modals/DriverProfileSheet";
 import StarDisplay from "../StarDisplay";
 
 export default function CompletedRoute({ count }: { count: number }) {
   const { modalVisible, setModalVisible, selectedRequest, handleSeeMorePress } =
     useSeeMoreDetails<CompletedBooking>();
+  const [profileDriver, setProfileDriver] = useState<Driver | null>(null);
   const { reportWindowDays } = useBookingSettings();
 
   const {
@@ -155,8 +157,15 @@ export default function CompletedRoute({ count }: { count: number }) {
           onClose={() => setModalVisible(false)}
           data={selectedRequest}
           isAccepted={true}
+          onPressDriverProfile={() => setProfileDriver(selectedRequest.driver)}
         />
       )}
+
+      <DriverProfileSheet
+        visible={profileDriver !== null}
+        driver={profileDriver}
+        onClose={() => setProfileDriver(null)}
+      />
     </>
   );
 }
@@ -255,7 +264,7 @@ const CompletedCard = ({
                 <Ionicons name="person-circle" size={50} color="#F7931E" />
               )}
               <View className="flex-1">
-                <Text className="text-lg font-semibold text-gray-800">
+                <Text className="text-lg font-semibold text-gray-800 capitalize">
                   {driver.name}
                 </Text>
                 <View className="flex-row gap-2 items-center">
@@ -331,11 +340,13 @@ function SeeMoreModal({
   visible,
   onClose,
   data,
+  onPressDriverProfile,
 }: {
   visible: boolean;
   onClose: () => void;
   data: CompletedBooking;
   isAccepted: boolean;
+  onPressDriverProfile?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const { reportWindowDays } = useBookingSettings();
@@ -491,7 +502,7 @@ function SeeMoreModal({
                     <Ionicons name="person-circle" size={44} color="#F7931E" />
                   )}
                   <View className="flex-1">
-                    <Text className="text-lg font-semibold text-gray-800">
+                    <Text className="text-lg font-semibold text-gray-800 capitalize">
                       {data.driver.name}
                     </Text>
                     <View className="flex-row gap-2 items-center">
@@ -500,6 +511,17 @@ function SeeMoreModal({
                         ({data.driver.rating})
                       </Text>
                     </View>
+                    {onPressDriverProfile && (
+                      <Pressable
+                        onPress={onPressDriverProfile}
+                        hitSlop={8}
+                        className="mt-1 active:opacity-80"
+                      >
+                        <Text className="text-xs font-medium text-lightPrimary">
+                          View profile
+                        </Text>
+                      </Pressable>
+                    )}
                   </View>
                 </View>
 

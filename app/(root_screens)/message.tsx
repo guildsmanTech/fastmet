@@ -523,7 +523,7 @@ const Message = () => {
             )}
 
             <View className="flex-1">
-              <Text className="text-base font-bold text-white">
+              <Text className="text-base font-bold text-white capitalize">
                 {conversation?.driver.firstName} {conversation?.driver.lastName}
               </Text>
               <View className="flex-row gap-1 items-center">

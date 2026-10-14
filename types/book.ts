@@ -98,6 +98,12 @@ export type Driver = {
   rating: number;
   profilePictureUrl: string;
   phoneNumber: string;
+  /** Already masked by the API, e.g. AB**34 */
+  plateNumber?: string | null;
+  /** Up to 2 vehicle exterior photos */
+  vehicleImages?: string[];
+  /** Completed trips for this driver */
+  totalBookings?: number;
 };
 
 export type RequestBooking = {

@@ -245,7 +245,7 @@ export default function ViewOnMap() {
                   <Ionicons name="person-circle" size={48} color="#F7931E" />
                 )}
                 <View>
-                  <Text className="text-lg font-semibold text-gray-800">
+                  <Text className="text-lg font-semibold text-gray-800 capitalize">
                     {booking.driver.name}
                   </Text>
                   <View className="flex-row gap-2 items-center">

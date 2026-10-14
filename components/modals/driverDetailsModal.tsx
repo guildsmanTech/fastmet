@@ -64,7 +64,7 @@ function DriverDetailsModal({
               ) : (
                 <Ionicons name="person-circle" size={120} color="#F7931E" />
               )}
-              <Text className="mt-4 text-2xl font-bold text-gray-900">
+              <Text className="mt-4 text-2xl font-bold text-gray-900 capitalize">
                 {driver.name}
               </Text>
               <View className="flex-row items-center gap-2 mt-2">

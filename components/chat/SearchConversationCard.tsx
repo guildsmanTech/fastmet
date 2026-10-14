@@ -22,7 +22,7 @@ const SearchConversationCard = ({ item }: { item: ConversationResponse }) => {
                 <Ionicons name="person-circle" size={40} color="#F7931E" />
             )}
             <View className="flex-1 gap-1">
-                <Text className="font-bold max-w-[60%]" numberOfLines={1}>{item.driver.firstName} {item.driver.lastName}</Text>
+                <Text className="font-bold max-w-[60%] capitalize" numberOfLines={1}>{item.driver.firstName} {item.driver.lastName}</Text>
             </View>
         </Pressable>
     );

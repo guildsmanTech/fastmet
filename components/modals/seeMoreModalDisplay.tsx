@@ -48,12 +48,14 @@ export default function SeeMoreModalDisplay({
   type,
   data,
   onOpenDriverOffers,
+  onPressDriverProfile,
 }: {
   visible: boolean;
   onClose: () => void;
   type: string;
   data: Booking | ActiveBooking;
   onOpenDriverOffers?: () => void;
+  onPressDriverProfile?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const {reportWindowDays} = useBookingSettings();
@@ -189,7 +191,7 @@ export default function SeeMoreModalDisplay({
                       />
                     )}
                     <View className="flex-1">
-                      <Text className="text-lg font-semibold text-gray-800">
+                      <Text className="text-lg font-semibold text-gray-800 capitalize">
                         {data.driver.name}
                       </Text>
                       <View className="flex-row gap-2 items-center">
@@ -198,6 +200,17 @@ export default function SeeMoreModalDisplay({
                           ({data.driver.rating})
                         </Text>
                       </View>
+                      {onPressDriverProfile && (
+                        <Pressable
+                          onPress={onPressDriverProfile}
+                          hitSlop={8}
+                          className="mt-1 active:opacity-80"
+                        >
+                          <Text className="text-xs font-medium text-lightPrimary">
+                            View profile
+                          </Text>
+                        </Pressable>
+                      )}
                     </View>
                   </View>
 
