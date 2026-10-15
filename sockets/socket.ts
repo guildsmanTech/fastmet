@@ -1,4 +1,5 @@
 import { io, Socket } from "socket.io-client";
+import { socketVersionAuth } from "@/utils/appVersion";
 
 const SOCKET_URL = process.env.EXPO_PUBLIC_BASE_URL;
 
@@ -22,7 +23,7 @@ export const getSocket = (token: string) => {
     // Create new socket
     socket = io(SOCKET_URL, {
       autoConnect: false,
-      auth: { token },
+      auth: { token, ...socketVersionAuth() },
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,

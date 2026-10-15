@@ -1,5 +1,6 @@
 import { apiUrl } from "@/lib/axios";
 import { useAppStore } from "@/store/useAppStore";
+import { versionHeaders } from "@/utils/appVersion";
 import axios from "axios";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -99,6 +100,7 @@ export const uploadBookingImages = async (
     headers: {
       "Content-Type": "multipart/form-data",
       Authorization: `Bearer ${useAppStore.getState().token}`,
+      ...versionHeaders(),
     },
   });
 

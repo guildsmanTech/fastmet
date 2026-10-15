@@ -4,6 +4,7 @@ import {
 } from "@/constants/routes";
 import {getSocket} from "@/sockets/socket";
 import {useAppStore} from "@/store/useAppStore";
+import {versionHeaders} from "@/utils/appVersion";
 import {clearPushRegistrationCache} from "@/utils/helpers/pushRegistration";
 import axios, {InternalAxiosRequestConfig} from "axios";
 import {router} from "expo-router";
@@ -32,6 +33,7 @@ export const ensureFreshToken = (): Promise<string> => {
     .post<{accessToken: string; refreshToken: string}>(
       `${apiUrl}/auth/refresh`,
       {refreshToken: storedRefreshToken},
+      {headers: versionHeaders()},
     )
     .then(({data}) => {
       useAppStore.getState().setAuthData({
@@ -77,6 +79,9 @@ api.interceptors.request.use(
     if (token) {
       config.headers.set("Authorization", `Bearer ${token}`);
     }
+    for (const [key, value] of Object.entries(versionHeaders())) {
+      config.headers.set(key, value);
+    }
     return config;
   },
   (error) => Promise.reject(error),
@@ -88,6 +93,19 @@ api.interceptors.response.use(
     const data = error.response?.data;
     const status = error.response?.status;
     const originalRequest = error.config;
+
+    // App build below the server's minimum (version gate). Show the force
+    // update modal; reject (not hang) so callers finish. Never logs out. The
+    // server never sends this to a user with a trip in progress.
+    if (status === 426 && data?.code === "APP_UPDATE_REQUIRED") {
+      useAppStore.getState().setUpdateRequired({
+        minBuild: data.minBuild,
+        latestBuild: data.latestBuild,
+        storeUrl: data.storeUrl,
+        deferred: false,
+      });
+      return Promise.reject(error);
+    }
 
     if (status === 403 && data?.deviceBanned) {
       const socket = getSocket("");

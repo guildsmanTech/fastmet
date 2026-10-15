@@ -14,6 +14,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import AnimatedSplash from "@/components/AnimatedSplash";
 import LoadingModal from "@/components/modals/loading";
+import UpdateGate from "@/components/UpdateGate";
 import { toastConfig } from "@/config/toastConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useSyncAuthMeta } from "@/hooks/useSyncAuthMeta";
@@ -144,6 +145,8 @@ export default Sentry.wrap(function RootLayout() {
           </SocketProvider>
           <Toast config={toastConfig} />
           <LoadingModal />
+          {/* Last, so a forced update sits on top of the other modals. */}
+          <UpdateGate />
         </QueryClientProvider>
 
         <StatusBar backgroundColor="#0F2535" barStyle="light-content" />

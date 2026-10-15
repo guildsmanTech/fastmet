@@ -1,6 +1,7 @@
 import {useAuth} from "@/hooks/useAuth";
 import {ensureFreshToken, performLogout} from "@/lib/axios";
 import {useAppStore} from "@/store/useAppStore";
+import {runUpdateCheck} from "@/utils/helpers/appUpdateCheck";
 import {DefaultEventsMap} from "@socket.io/component-emitter";
 import React, {createContext, useContext, useEffect, useMemo} from "react";
 import {AppState} from "react-native";
@@ -37,9 +38,14 @@ export default function SocketProvider({
 }) {
   const {token} = useAuth();
   const socket = useMemo(() => (token ? getSocket(token) : null), [token]);
+  // Forced update (not deferred by a trip in progress): stay disconnected.
+  // Flipping this to true re-runs the effect, whose cleanup disconnects.
+  const updateBlocked = useAppStore(
+    (state) => !!state.updateRequired && !state.updateRequired.deferred,
+  );
 
   useEffect(() => {
-    if (!socket || !token) return;
+    if (!socket || !token || updateBlocked) return;
 
     socket.connect();
 
@@ -54,6 +60,13 @@ export default function SocketProvider({
 
     socket.on("connect_error", async (err) => {
       console.error("🔌 Socket connection error:", err.message);
+
+      // Server-side version gate. Don't retry; the update check shows the modal.
+      if (err.message === "APP_UPDATE_REQUIRED") {
+        socket.disconnect();
+        void runUpdateCheck();
+        return;
+      }
 
       if (err.message !== "Authentication failed") return;
       if (refreshAttempted) return;
@@ -111,7 +124,7 @@ export default function SocketProvider({
       cleanupContinuanceCancelled();
       socket.disconnect();
     };
-  }, [socket, token]);
+  }, [socket, token, updateBlocked]);
 
   return (
     <SocketContext.Provider value={{socket}}>{children}</SocketContext.Provider>

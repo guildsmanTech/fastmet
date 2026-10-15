@@ -2,6 +2,7 @@ import {UserAddress} from "@/types/user";
 import {create} from "zustand";
 import {persist} from "zustand/middleware";
 import {createSecureStorage} from "./secureStorage";
+import {AppUpdateSlice, createAppUpdateSlice} from "./slices/appUpdateSlice";
 import {ApprovalStatus, AuthSlice, createAuthSlice} from "./slices/authSlice";
 import {
   BookingTypeSlice,
@@ -30,6 +31,7 @@ type PersistedAuth = {
   address: UserAddress;
   preRegistered: boolean;
   email: string | null;
+  dismissedSoftBuild: number | null;
 };
 
 export type AppStore = BookSlice &
@@ -39,7 +41,8 @@ export type AppStore = BookSlice &
   VehicleSlice &
   NotificationSlice &
   BookingTypeSlice &
-  LiveEtaSlice;
+  LiveEtaSlice &
+  AppUpdateSlice;
 
 const secureStorage = createSecureStorage<PersistedAuth>();
 
@@ -54,6 +57,7 @@ export const useAppStore = create<AppStore>()(
       ...createNotificationSlice(...a),
       ...createBookingTypeSlice(...a),
       ...createLiveEtaSlice(...a),
+      ...createAppUpdateSlice(...a),
     }),
     {
       name: "fastmet-client-storage",
@@ -71,6 +75,7 @@ export const useAppStore = create<AppStore>()(
         address: state.address,
         preRegistered: state.preRegistered,
         email: state.email ?? null,
+        dismissedSoftBuild: state.dismissedSoftBuild,
       }),
     },
   ),
