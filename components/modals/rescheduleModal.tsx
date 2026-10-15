@@ -31,11 +31,14 @@ export default function RescheduleModal({
   onClose,
   onConfirm,
   isSubmitting,
+  requiresDriverConfirmation = false,
 }: {
   visible: boolean;
   onClose: () => void;
   onConfirm: (isoTime: string) => void;
   isSubmitting?: boolean;
+  /** When true, assigned driver must keep/decline after confirm. */
+  requiresDriverConfirmation?: boolean;
 }) {
   const [selectedDate, setSelectedDate] = useState(getMinTime());
   const [selectedTime, setSelectedTime] = useState(getMinTime());
@@ -111,9 +114,19 @@ export default function RescheduleModal({
             <Text className="text-lg font-bold">Reschedule pickup</Text>
           </View>
 
-          <Text className="mb-4 text-sm text-center text-gray-500">
-            Max schedule: 1 month
+          <Text className="mb-3 text-sm text-center text-gray-500">
+            Choose a time at least 2 hours from now (max 1 month).
           </Text>
+
+          {requiresDriverConfirmation && (
+            <View className="flex-row items-start gap-2 p-3 mb-4 rounded-xl border border-amber-200 bg-amber-50">
+              <Ionicons name="alert-circle" size={18} color="#B45309" />
+              <Text className="flex-1 text-xs leading-4 text-amber-900">
+                Your assigned driver will need to confirm the new time. If they
+                decline, the booking opens again for other drivers.
+              </Text>
+            </View>
+          )}
 
           {Platform.OS === "ios" ? (
             <>
@@ -254,7 +267,9 @@ export default function RescheduleModal({
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text className="font-semibold text-center text-white">
-                  Confirm new time
+                  {requiresDriverConfirmation
+                    ? "Request new time"
+                    : "Confirm new time"}
                 </Text>
               )}
             </Pressable>

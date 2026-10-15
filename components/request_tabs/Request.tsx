@@ -355,28 +355,39 @@ export default function RequestRoute() {
           paddingBottom: 40,
           gap: 15,
         }}
-        renderItem={({item}) => (
-          <RequestCard
-            driver={item.driver}
-            maxLoadKg={item.selectedVehicle.maxLoadKg ?? 0}
-            status={item.status as "pending" | "scheduled"}
-            vehicle={item.selectedVehicle.name}
-            bookingType={item.bookingType}
-            pickup={item.pickUp}
-            dropoff={item.dropOff}
-            distance={item.routeData.distance}
-            amount={item.routeData.totalPrice}
-            isCash={item.paymentMethod === "cash"}
-            onCancel={() => setSelectedId(item._id)}
-            onReschedule={() => setRescheduleBookingId(item._id)}
-            onPressSeeMore={() => handleSeeMorePress(item)}
-            driverOffers={item.requestedDrivers}
-            onOpenDrivers={() => {
-              setSelectedDriver(null);
-              setDriversModalBookingId(item._id);
-            }}
-          />
-        )}
+        renderItem={({item}) => {
+          const awaitingDriverConfirm =
+            item.rescheduleConfirmation?.status === "pending";
+          return (
+            <RequestCard
+              driver={item.driver}
+              maxLoadKg={item.selectedVehicle.maxLoadKg ?? 0}
+              status={item.status as "pending" | "scheduled"}
+              vehicle={item.selectedVehicle.name}
+              bookingType={item.bookingType}
+              pickup={item.pickUp}
+              dropoff={item.dropOff}
+              distance={item.routeData.distance}
+              amount={item.routeData.totalPrice}
+              isCash={item.paymentMethod === "cash"}
+              awaitingDriverConfirm={awaitingDriverConfirm}
+              confirmationExpiresAt={
+                item.rescheduleConfirmation?.expiresAt ?? null
+              }
+              onCancel={() => setSelectedId(item._id)}
+              onReschedule={() => {
+                if (awaitingDriverConfirm) return;
+                setRescheduleBookingId(item._id);
+              }}
+              onPressSeeMore={() => handleSeeMorePress(item)}
+              driverOffers={item.requestedDrivers}
+              onOpenDrivers={() => {
+                setSelectedDriver(null);
+                setDriversModalBookingId(item._id);
+              }}
+            />
+          );
+        }}
         refreshing={refreshing}
         onRefresh={handleRefresh}
         onEndReached={handleEndReached}
@@ -426,9 +437,35 @@ export default function RequestRoute() {
       <RescheduleModal
         visible={rescheduleBookingId !== null}
         isSubmitting={rescheduleMutation.isPending}
+        requiresDriverConfirmation={(() => {
+          const booking = [...pendingBookings, ...scheduledBookings].find(
+            (b) => b._id === rescheduleBookingId,
+          );
+          return (
+            booking?.status === "scheduled" &&
+            !!booking.driver &&
+            booking.rescheduleConfirmation?.status !== "pending"
+          );
+        })()}
         onClose={() => setRescheduleBookingId(null)}
         onConfirm={(isoTime) => {
           if (!rescheduleBookingId) return;
+          const booking = [...pendingBookings, ...scheduledBookings].find(
+            (b) => b._id === rescheduleBookingId,
+          );
+          if (booking?.rescheduleConfirmation?.status === "pending") {
+            setRescheduleBookingId(null);
+            Toast.show({
+              type: "info",
+              text1: "Waiting for driver",
+              text2:
+                "Your driver still needs to confirm the previous reschedule.",
+              position: "top",
+              visibilityTime: 4000,
+              topOffset: 50,
+            });
+            return;
+          }
           rescheduleMutation.mutate(
             {
               bookingId: rescheduleBookingId,
@@ -485,6 +522,8 @@ type RequestCardProps = {
   onOpenDrivers: () => void;
   driver?: Driver;
   status: "pending" | "scheduled";
+  awaitingDriverConfirm?: boolean;
+  confirmationExpiresAt?: string | null;
 };
 
 const RequestCard = ({
@@ -503,11 +542,16 @@ const RequestCard = ({
   onPressSeeMore,
   driverOffers = [],
   onOpenDrivers,
+  awaitingDriverConfirm = false,
+  confirmationExpiresAt = null,
 }: RequestCardProps) => {
   const hasOffers = driverOffers.length > 0;
   const maxStackedAvatars = 4;
   const displayedAvatars = driverOffers.slice(0, maxStackedAvatars);
   const remainingCount = Math.max(0, driverOffers.length - maxStackedAvatars);
+  const expiryLabel = confirmationExpiresAt
+    ? formatDate(confirmationExpiresAt)
+    : null;
 
   return (
     <>
@@ -609,6 +653,24 @@ const RequestCard = ({
                 <View className="px-2 py-1 bg-green-500 rounded-md">
                   <Text className="text-xs font-medium text-white">
                     Assigned
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {awaitingDriverConfirm && (
+              <View className="flex-row items-start gap-3 p-3 mt-4 rounded-xl border border-amber-200 bg-amber-50">
+                <View className="items-center justify-center mt-0.5 size-8 rounded-full bg-amber-100">
+                  <Ionicons name="time-outline" size={18} color="#B45309" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-amber-900">
+                    Waiting for driver confirmation
+                  </Text>
+                  <Text className="mt-0.5 text-xs leading-4 text-amber-800">
+                    Your driver must keep or decline the new pickup time
+                    {expiryLabel ? ` before ${expiryLabel}` : " within 1 hour"}.
+                    Reschedule is locked until they respond.
                   </Text>
                 </View>
               </View>
@@ -729,12 +791,27 @@ const RequestCard = ({
 
                 {bookingType.type === "schedule" && (
                   <Pressable
-                    className="flex-row flex-1 justify-center items-center py-3 ml-2 rounded-xl border border-lightPrimary active:bg-gray-50"
+                    disabled={awaitingDriverConfirm}
+                    className={`flex-row flex-1 justify-center items-center py-3 ml-2 rounded-xl border ${
+                      awaitingDriverConfirm
+                        ? "border-gray-200 bg-gray-50 opacity-60"
+                        : "border-lightPrimary active:bg-gray-50"
+                    }`}
                     onPress={onReschedule}
                   >
-                    <Ionicons name="time-outline" size={18} color="#333" />
-                    <Text className="ml-2 font-medium text-gray-700">
-                      Reschedule
+                    <Ionicons
+                      name="time-outline"
+                      size={18}
+                      color={awaitingDriverConfirm ? "#9CA3AF" : "#333"}
+                    />
+                    <Text
+                      className={`ml-2 font-medium ${
+                        awaitingDriverConfirm
+                          ? "text-gray-400"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {awaitingDriverConfirm ? "Awaiting driver" : "Reschedule"}
                     </Text>
                   </Pressable>
                 )}

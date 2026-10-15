@@ -80,13 +80,15 @@ export const useRescheduleBookingMutation = () =>
       queryClient.invalidateQueries({queryKey: ["userBookingCounts"]});
 
       Toast.show({
-        type: "success",
-        text1: "Booking rescheduled",
+        type: data?.awaitingDriverConfirmation ? "info" : "success",
+        text1: data?.awaitingDriverConfirmation
+          ? "Waiting for driver"
+          : "Booking rescheduled",
         text2: data?.awaitingDriverConfirmation
-          ? "Waiting for your driver to confirm the new time (1 hour)."
+          ? "Your driver has 1 hour to keep or decline the new pickup time."
           : "Pickup time has been updated.",
         position: "top",
-        visibilityTime: 4000,
+        visibilityTime: data?.awaitingDriverConfirmation ? 5000 : 4000,
         swipeable: true,
         topOffset: 50,
       });
@@ -97,7 +99,7 @@ export const useRescheduleBookingMutation = () =>
         text1: "Could not reschedule",
         text2: error.response?.data?.message || "Please try again",
         position: "top",
-        visibilityTime: 4000,
+        visibilityTime: 4500,
         swipeable: true,
         topOffset: 50,
       });

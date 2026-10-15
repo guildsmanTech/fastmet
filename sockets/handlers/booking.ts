@@ -235,9 +235,9 @@ export const rescheduleDriverResponse = (socket: Socket) => {
       type: "info",
       text1: "Driver declined new time",
       text2:
-        "Your booking is open again for other drivers. You can wait or cancel.",
+        "Booking is open again for other drivers. You can wait or cancel.",
       position: "top",
-      visibilityTime: 5000,
+      visibilityTime: 5500,
       swipeable: true,
       topOffset: 50,
     });
@@ -252,8 +252,8 @@ export const rescheduleDriverResponse = (socket: Socket) => {
 
     Toast.show({
       type: "success",
-      text1: "Driver confirmed",
-      text2: "Your driver accepted the new pickup time.",
+      text1: "Driver confirmed new time",
+      text2: "Your assigned driver will keep this booking.",
       position: "top",
       visibilityTime: 4000,
       swipeable: true,

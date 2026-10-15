@@ -75,6 +75,12 @@ export type Booking = {
     status: "pending" | "resolved" | "dismissed";
     reportId: string;
   } | null;
+  /** Pending while assigned driver must confirm a client reschedule. */
+  rescheduleConfirmation?: {
+    status: "pending";
+    requestedAt: string;
+    expiresAt: string;
+  } | null;
 };
 
 export type ActiveBooking = Booking & {driver: Driver};
