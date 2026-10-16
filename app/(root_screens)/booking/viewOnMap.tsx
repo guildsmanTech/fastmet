@@ -201,6 +201,7 @@ export default function ViewOnMap() {
           bookingId={bookingId}
           driver={booking.driver!}
           status={booking.status}
+          isPooling={booking.bookingType?.type === "pooling"}
         />
       </View>
       <View className="absolute right-0 bottom-0 left-0">

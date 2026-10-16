@@ -23,6 +23,14 @@ export type RouteData = {
   gasAdjFactor?: number;
 };
 
+/** `bookingId` and `ts` are absent from older backends. */
+export type DriverLocationResponsePayload = {
+  bookingId?: string;
+  driverLoc: {lat: number; lng: number} | null;
+  /** Server time (ms epoch) the position was received. */
+  ts?: number;
+};
+
 export type BookingETAUpdatedPayload = {
   bookingId: string;
   distanceKm: number;
