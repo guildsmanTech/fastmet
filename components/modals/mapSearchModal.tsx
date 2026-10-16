@@ -1,3 +1,4 @@
+import { fetchRoadPoint } from "@/api/pricing";
 import { useShake } from "@/hooks/useShakeAnimation";
 import { useAppStore } from "@/store/useAppStore";
 import { LocationDetails } from "@/types/book";
@@ -8,7 +9,7 @@ import {
   isDropOffAllowed,
   isWithinAllowedPickupBounds,
 } from "@/utils/constants";
-import { formatLocation } from "@/utils/helpers/location";
+import { formatLocation, formatMeters } from "@/utils/helpers/location";
 import { getArray, pushToArray } from "@/utils/helpers/recentPlaceStorage";
 import * as Contacts from "expo-contacts";
 import * as Location from "expo-location";
@@ -29,6 +30,7 @@ import { Place } from "react-native-google-places-textinput";
 import MapView, { Region } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapPinStepView from "./(search-modal)/MapPinStepView";
+import OffRoadWarningModal from "./(search-modal)/OffRoadWarningModal";
 import PickupCoverageModal from "./(search-modal)/PickupCoverageModal";
 import SearchStepView from "./(search-modal)/SearchStepView";
 
@@ -56,6 +58,23 @@ const SAME_LOCATION_ERROR =
 
 const SAME_LOCATION_THRESHOLD_M = 5;
 const MAP_DRAG_VALIDATE_DELAY_MS = 400;
+
+/** Re-confirming within this distance reuses the last road-point result (no new lookup). */
+const ROAD_RECHECK_MIN_MOVE_M = 10;
+/** Road point farther than this from the pin = not reachable by vehicle (matches driver app). */
+const OFF_ROAD_THRESHOLD_M = 30;
+/** Never hold up "Confirm pin" longer than this for the road lookup. */
+const ROAD_LOOKUP_TIMEOUT_MS = 4000;
+
+/** acknowledged = client already saw the off-road warning for this pin. */
+type RoadCheck = { pin: Coords; road: Coords | null; acknowledged: boolean };
+
+function metersBetween(a: Coords, b: Coords) {
+  return getDistance(
+    { latitude: a.lat, longitude: a.lng },
+    { latitude: b.lat, longitude: b.lng },
+  );
+}
 
 function validateCoords(
   type: SearchType,
@@ -190,6 +209,10 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
   const [phoneError, setPhoneError] = useState(false);
 
   const [showCoverage, setShowCoverage] = useState(false);
+  const [offRoadPrompt, setOffRoadPrompt] = useState<{
+    distanceLabel: string;
+    onUse: () => void;
+  } | null>(null);
 
   const contactLabel = type === "pickup" ? "Sender" : "Receiver";
   const isContactValid = useMemo(
@@ -216,6 +239,32 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
     null,
   );
 
+  // Nearest drivable road, looked up only on "Confirm pin" (one paid lookup
+  // per confirm at most; server-cached).
+  const [roadCheck, setRoadCheck] = useState<RoadCheck | null>(null);
+  const roadAbortRef = useRef<AbortController | null>(null);
+
+  const cancelRoadCheck = () => {
+    roadAbortRef.current?.abort();
+    roadAbortRef.current = null;
+  };
+
+  /** Resolves null on failure/timeout — informational, never blocks confirm. */
+  const lookupRoadPoint = async (pin: Coords): Promise<Coords | null> => {
+    cancelRoadCheck();
+    const controller = new AbortController();
+    roadAbortRef.current = controller;
+    const timer = setTimeout(() => controller.abort(), ROAD_LOOKUP_TIMEOUT_MS);
+    try {
+      return await fetchRoadPoint(pin, controller.signal);
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+      if (roadAbortRef.current === controller) roadAbortRef.current = null;
+    }
+  };
+
   useEffect(() => {
     if (visible) {
       setAdditionalDetails(haveValue?.additionalDetails || "");
@@ -227,9 +276,13 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
       setContactPhone(haveValue?.contactPhone || "");
       setNameError(false);
       setPhoneError(false);
-    } else if (dragValidateTimerRef.current) {
-      clearTimeout(dragValidateTimerRef.current);
-      dragValidateTimerRef.current = null;
+    } else {
+      if (dragValidateTimerRef.current) {
+        clearTimeout(dragValidateTimerRef.current);
+        dragValidateTimerRef.current = null;
+      }
+      cancelRoadCheck();
+      setRoadCheck(null);
     }
   }, [visible, haveValue?.additionalDetails, haveValue]);
 
@@ -237,6 +290,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
     return () => {
       if (dragValidateTimerRef.current)
         clearTimeout(dragValidateTimerRef.current);
+      cancelRoadCheck();
     };
   }, []);
 
@@ -298,6 +352,9 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
     setMapName(name);
     setMapAddress(address);
     setStep("map");
+
+    cancelRoadCheck();
+    setRoadCheck(null);
 
     requestAnimationFrame(() => {
       mapRef.current?.animateToRegion(
@@ -484,6 +541,16 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
     }, MAP_DRAG_VALIDATE_DELAY_MS);
   };
 
+  // Car marker + notice after the warning, while the pin stays put.
+  const offRoad = useMemo(() => {
+    if (!markerCoord || !roadCheck?.road) return null;
+    if (metersBetween(roadCheck.pin, markerCoord) >= ROAD_RECHECK_MIN_MOVE_M)
+      return null;
+    const meters = metersBetween(markerCoord, roadCheck.road);
+    if (meters <= OFF_ROAD_THRESHOLD_M) return null;
+    return { roadPoint: roadCheck.road, meters };
+  }, [markerCoord, roadCheck]);
+
   const handleMapConfirmPin = async () => {
     if (!markerCoord) return;
 
@@ -499,19 +566,29 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
       return;
     }
 
+    const pin = markerCoord;
     let finalName = mapName;
     let finalAddress = mapAddress;
     let finalCity: string | null = null;
 
-    if (pinMoved) {
-      setResolvingAddress(true);
-      const geocoded = await reverseGeocode(markerCoord.lat, markerCoord.lng);
-      setResolvingAddress(false);
+    // Same spot as the last check → reuse it (no new lookup).
+    const previous =
+      roadCheck && metersBetween(roadCheck.pin, pin) < ROAD_RECHECK_MIN_MOVE_M
+        ? roadCheck
+        : null;
 
+    // Address + road lookups run in parallel, so confirm is no slower.
+    setResolvingAddress(true);
+    const [geocoded, road] = await Promise.all([
+      pinMoved ? reverseGeocode(pin.lat, pin.lng) : Promise.resolve(null),
+      previous ? Promise.resolve(previous.road) : lookupRoadPoint(pin),
+    ]);
+    setResolvingAddress(false);
+
+    if (pinMoved) {
       finalName = geocoded?.name || "Dropped pin";
       finalAddress =
-        geocoded?.address ||
-        `${markerCoord.lat.toFixed(6)}, ${markerCoord.lng.toFixed(6)}`;
+        geocoded?.address || `${pin.lat.toFixed(6)}, ${pin.lng.toFixed(6)}`;
       finalCity = geocoded?.city ?? null;
 
       if (type === "pickup") {
@@ -525,10 +602,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
         }
       }
 
-      if (
-        type === "dropoff" &&
-        !isDropOffAllowed(markerCoord.lat, markerCoord.lng)
-      ) {
+      if (type === "dropoff" && !isDropOffAllowed(pin.lat, pin.lng)) {
         showValidationError(DROPOFF_AREA_ERROR);
         shake();
         return;
@@ -538,11 +612,30 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
     const newLoc = {
       name: finalName,
       address: finalAddress,
-      coords: markerCoord,
+      coords: pin,
     };
-    setConfirmedLocation(newLoc);
-    setSearchText(formatLocation(newLoc));
-    setStep("search");
+    const finishConfirm = () => {
+      setConfirmedLocation(newLoc);
+      setSearchText(formatLocation(newLoc));
+      setStep("search");
+    };
+
+    const roadMeters = road ? metersBetween(pin, road) : 0;
+    const isOffRoad = road !== null && roadMeters > OFF_ROAD_THRESHOLD_M;
+
+    // Warn once per pin; confirming again at the same spot means "keep it".
+    if (!isOffRoad || previous?.acknowledged) {
+      setRoadCheck({ pin, road, acknowledged: previous?.acknowledged ?? false });
+      finishConfirm();
+      return;
+    }
+
+    // Shows the car marker + notice on the map behind the dialog.
+    setRoadCheck({ pin, road, acknowledged: true });
+    setOffRoadPrompt({
+      distanceLabel: formatMeters(roadMeters),
+      onUse: finishConfirm,
+    });
   };
 
   const handleFinalConfirm = async () => {
@@ -604,6 +697,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
               mapRef={mapRef}
               onRegionChangeComplete={handleRegionChangeComplete}
               resolvingAddress={resolvingAddress}
+              offRoad={offRoad}
               onConfirmPin={handleMapConfirmPin}
               onBack={() => setStep("search")}
               bottomInset={inset.bottom}
@@ -651,6 +745,16 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
           )}
         </View>
       </TouchableWithoutFeedback>
+
+      <OffRoadWarningModal
+        visible={offRoadPrompt !== null}
+        distanceLabel={offRoadPrompt?.distanceLabel ?? ""}
+        onMovePin={() => setOffRoadPrompt(null)}
+        onUsePin={() => {
+          offRoadPrompt?.onUse();
+          setOffRoadPrompt(null);
+        }}
+      />
 
       {type === "pickup" && (
         <PickupCoverageModal

@@ -1,4 +1,5 @@
 import {STATIC_IMAGES} from "@/utils/constants";
+import {formatMeters} from "@/utils/helpers/location";
 import {Ionicons} from "@expo/vector-icons";
 import {Image} from "expo-image";
 import React, {RefObject} from "react";
@@ -10,7 +11,12 @@ import {
   TextInput,
   View,
 } from "react-native";
-import MapView, {PROVIDER_GOOGLE, Region} from "react-native-maps";
+import MapView, {
+  Marker,
+  Polyline,
+  PROVIDER_GOOGLE,
+  Region,
+} from "react-native-maps";
 
 type Coords = {lat: number; lng: number};
 type SearchType = "pickup" | "dropoff";
@@ -26,6 +32,8 @@ type MapPinStepViewProps = {
   mapRef: RefObject<MapView | null>;
   onRegionChangeComplete: (region: Region) => void;
   resolvingAddress: boolean;
+  /** Set when the pin isn't reachable by vehicle: nearest road point + distance. */
+  offRoad: {roadPoint: Coords; meters: number} | null;
   onConfirmPin: () => void;
   onBack: () => void;
   bottomInset: number;
@@ -42,10 +50,14 @@ const MapPinStepView: React.FC<MapPinStepViewProps> = ({
   mapRef,
   onRegionChangeComplete,
   resolvingAddress,
+  offRoad,
   onConfirmPin,
   onBack,
   bottomInset,
 }) => {
+  const roadCoord = offRoad
+    ? {latitude: offRoad.roadPoint.lat, longitude: offRoad.roadPoint.lng}
+    : null;
   return (
     <View style={{flex: 1}}>
       <View
@@ -99,7 +111,43 @@ const MapPinStepView: React.FC<MapPinStepViewProps> = ({
             longitudeDelta: 0.001,
           }}
           onRegionChangeComplete={onRegionChangeComplete}
-        />
+        >
+          {roadCoord && (
+            <>
+              <Polyline
+                coordinates={[
+                  roadCoord,
+                  {latitude: markerCoord.lat, longitude: markerCoord.lng},
+                ]}
+                strokeWidth={3}
+                strokeColor="#6B7280"
+                lineDashPattern={[6, 6]}
+              />
+              <Marker
+                coordinate={roadCoord}
+                anchor={{x: 0.5, y: 0.5}}
+                title="Nearest road"
+                description="The driver can only reach this point"
+              >
+                <View
+                  collapsable={false}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: "#0F2535",
+                    borderWidth: 2,
+                    borderColor: "#FFFFFF",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="car" size={15} color="#FFFFFF" />
+                </View>
+              </Marker>
+            </>
+          )}
+        </MapView>
         <View
           pointerEvents="none"
           style={{
@@ -118,9 +166,21 @@ const MapPinStepView: React.FC<MapPinStepViewProps> = ({
         className="px-6 pt-3 bg-white"
         style={{paddingBottom: bottomInset || 12}}
       >
-        <Text className="mb-2 text-xs text-center text-gray-400">
-          Move the map to adjust the pin position
-        </Text>
+        {offRoad ? (
+          <View className="flex-row gap-2 p-3 mb-3 bg-amber-50 rounded-xl border border-amber-200">
+            <Ionicons name="warning-outline" size={18} color="#B45309" />
+            <Text className="flex-1 text-xs leading-5 text-amber-900">
+              This spot isn&apos;t reachable by vehicle. The driver can only get
+              to the nearest road (car icon), about{" "}
+              {formatMeters(offRoad.meters)} away. Move the pin to the road, or
+              tap Confirm pin again to keep it.
+            </Text>
+          </View>
+        ) : (
+          <Text className="mb-2 text-xs text-center text-gray-400">
+            Move the map to adjust the pin position
+          </Text>
+        )}
         <Pressable
           className="items-center justify-center p-3.5 rounded-lg bg-lightPrimary active:bg-darkPrimary"
           onPress={onConfirmPin}

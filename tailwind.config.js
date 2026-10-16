@@ -18,6 +18,10 @@ module.exports = {
         secondary: "#0F2535",
         ctaSecondary: "#EBEBEB",
         ctaSecondaryActive: "#D9D9D9",
+        brand: {
+          navy: "#0F2535",
+          orange: "#ED8718",
+        },
       },
     },
   },

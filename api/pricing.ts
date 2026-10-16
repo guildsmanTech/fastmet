@@ -59,6 +59,22 @@ export const fetchRoutePreview = async (
   return res.data;
 };
 
+/**
+ * Nearest drivable road point for a map pin (server-cached). null when the
+ * pin is unknown/unreachable or the lookup is unavailable — informational only.
+ */
+export const fetchRoadPoint = async (
+  coords: {lat: number; lng: number},
+  signal?: AbortSignal,
+): Promise<{lat: number; lng: number} | null> => {
+  const res = await axios.post<{roadPoint: {lat: number; lng: number} | null}>(
+    `${publicPricingUrl}/road-point`,
+    {coords},
+    {signal},
+  );
+  return res.data.roadPoint ?? null;
+};
+
 /** User-facing message from a pricing API failure. */
 export const getPricingErrorMessage = (err: unknown): string => {
   const data = (err as {response?: {data?: {message?: string}}})?.response
