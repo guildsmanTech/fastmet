@@ -324,7 +324,9 @@ export default function LiveTrackingMapScreen({
   // Decide when a (billed) Directions request is needed: no route for this
   // stage yet, or the driver has clearly left the drawn route.
   useEffect(() => {
-    if (!driverLatLng || !target) return;
+    // Pooling: the driver visits other passengers' stops first, so a direct
+    // driver → this-booking route would be wrong (and keep triggering reroutes).
+    if (isPooling || !driverLatLng || !target) return;
 
     const sinceLast = Date.now() - lastRouteAttemptRef.current;
     const stageChanged = routeRequest?.targetKey !== targetKey;
@@ -356,7 +358,15 @@ export default function LiveTrackingMapScreen({
       offRouteCountRef.current = 0;
       setRouteRequest({origin: driverLatLng, target, targetKey});
     }
-  }, [activeRoute, driverLatLng, progress, routeRequest?.targetKey, target, targetKey]);
+  }, [
+    activeRoute,
+    driverLatLng,
+    isPooling,
+    progress,
+    routeRequest?.targetKey,
+    target,
+    targetKey,
+  ]);
 
   useEffect(() => {
     if (!routeRequest) return;
@@ -537,6 +547,7 @@ export default function LiveTrackingMapScreen({
             </>
           )}
           {/* Route not available yet: hint the direction with a dashed line */}
+          {/* Also the pooling line: direction only, since the driver may stop elsewhere first */}
           {!progress && markerPoint && target && (
             <Polyline
               coordinates={[markerPoint, target]}
@@ -595,6 +606,11 @@ export default function LiveTrackingMapScreen({
               Getting driver&apos;s location…
             </Text>
           ) : null}
+          {isPooling && status !== "need_continuance" && (
+            <Text className="mt-1 text-xs text-gray-500">
+              Your driver may make other stops first.
+            </Text>
+          )}
           {(isStale || (!isLive && driverPoint)) && driverPoint && (
             <View className="flex-row gap-1 items-center mt-1">
               <Ionicons name="time-outline" size={13} color="#9CA3AF" />

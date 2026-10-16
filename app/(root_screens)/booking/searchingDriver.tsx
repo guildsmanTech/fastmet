@@ -733,6 +733,7 @@ const DriverListCard = ({
                 onRemove={handleRemoveDriver}
                 onSelect={handleDriverSelect}
                 isPaused={areAllPaused} // All drivers get the same pause state
+                showAvailability={!isPooling}
               />
             ))}
           </ScrollView>
@@ -747,6 +748,7 @@ const DriverListCard = ({
           handleCloseModal={handleCloseModal}
           acceptDriver={acceptDriver}
           rejectDriver={rejectDriver}
+          showAvailability={!isPooling}
         />
       )}
     </>
@@ -759,11 +761,13 @@ const DriverRow = memo(
     onRemove,
     onSelect,
     isPaused,
+    showAvailability,
   }: {
     driver: RequestedDriver;
     onRemove: (id: string) => void;
     onSelect: (driver: RequestedDriver) => void;
     isPaused: boolean;
+    showAvailability: boolean;
   }) => {
     console.log("DriverRow");
     const translateX = useRef(new Animated.Value(-400)).current;
@@ -913,6 +917,24 @@ const DriverRow = memo(
                     {driver.rating} ({driver.totalBookings} bookings)
                   </Text>
                 </View>
+
+                {showAvailability && (
+                  <View
+                    className={`mt-1 self-start rounded-full px-2 py-0.5 ${
+                      driver.isQueued ? "bg-amber-100" : "bg-emerald-100"
+                    }`}
+                  >
+                    <Text
+                      className={`text-[10px] font-semibold ${
+                        driver.isQueued ? "text-amber-700" : "text-emerald-700"
+                      }`}
+                    >
+                      {driver.isQueued
+                        ? "Finishing a nearby delivery"
+                        : "Available now"}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 

@@ -12,12 +12,15 @@ function DriverDetailsModal({
   handleCloseModal,
   acceptDriver,
   rejectDriver,
+  showAvailability = false,
 }: {
   isModalOpen: boolean;
   driver: RequestedDriver;
   handleCloseModal: () => void;
   acceptDriver: () => void;
   rejectDriver?: () => void;
+  /** ASAP offers only: show whether the driver is free or finishing a trip. */
+  showAvailability?: boolean;
 }) {
   const inset = useSafeAreaInsets();
 
@@ -80,6 +83,33 @@ function DriverDetailsModal({
 
             {/* Info Cards */}
             <View className="gap-4">
+              {/* Availability */}
+              {!showAvailability ? null : driver.isQueued ? (
+                <View className="flex-row gap-3 p-4 rounded-xl bg-amber-50">
+                  <Ionicons name="time-outline" size={22} color="#B45309" />
+                  <View className="flex-1">
+                    <Text className="text-sm font-bold text-amber-800">
+                      Finishing a nearby delivery
+                    </Text>
+                    <Text className="mt-1 text-xs leading-5 text-amber-700">
+                      This driver will head to your pickup right after
+                      completing their current drop-off nearby.
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View className="flex-row items-center gap-3 p-4 rounded-xl bg-emerald-50">
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={22}
+                    color="#047857"
+                  />
+                  <Text className="text-sm font-bold text-emerald-800">
+                    Available now
+                  </Text>
+                </View>
+              )}
+
               {/* Distance */}
               {driver.distance && (
                 <View className="p-4 rounded-xl bg-orange-50">
