@@ -60,3 +60,17 @@ export const rescheduleBooking = async (
   });
   return res.data;
 };
+
+export type ShareLinkResponse = {
+  success: true;
+  url: string;
+  /** ISO date. The link also stops working as soon as the trip ends. */
+  expiresAt: string;
+};
+
+export const createShareLink = async (
+  bookingId: string,
+): Promise<ShareLinkResponse> => {
+  const res = await api.post<ShareLinkResponse>(`/share-links/${bookingId}`);
+  return res.data;
+};

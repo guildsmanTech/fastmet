@@ -1,5 +1,6 @@
 import LiveTrackingMapScreen from "@/components/maps/LiveTrackingMapScreen";
 import StarDisplay from "@/components/StarDisplay";
+import { useShareRouteMutation } from "@/mutations/booking";
 import { useBooking } from "@/queries/bookingQueries";
 import {
   clearConversationUnreadInCache,
@@ -48,6 +49,7 @@ export default function ViewOnMap() {
   const socket = useSocket();
 
   const { data: booking, isPending, error } = useBooking(bookingId ?? "");
+  const shareRoute = useShareRouteMutation();
 
   const clientId = useAppStore((s) => s.id);
   const activeConversationId = useMemo(() => {
@@ -179,6 +181,11 @@ export default function ViewOnMap() {
       </View>
     );
 
+  // Same statuses the backend accepts for a share link.
+  const canShareRoute =
+    !!booking.driver &&
+    ["active", "picked_up", "need_continuance"].includes(booking.status);
+
   const handleBack = () => {
     router.back();
     if (!shouldGoBack || shouldGoBack !== "true") {
@@ -294,6 +301,21 @@ export default function ViewOnMap() {
                   <Ionicons name="call" size={28} color="#F7931E" />
                   <Text className="text-gray-600">Call</Text>
                 </Pressable>
+                {canShareRoute && (
+                  <Pressable
+                    className="items-center active:scale-110"
+                    hitSlop={20}
+                    disabled={shareRoute.isPending}
+                    onPress={() => shareRoute.mutate({ bookingId })}
+                  >
+                    {shareRoute.isPending ? (
+                      <ActivityIndicator size={28} color="#F7931E" />
+                    ) : (
+                      <Ionicons name="share-social" size={28} color="#F7931E" />
+                    )}
+                    <Text className="text-gray-600">Share</Text>
+                  </Pressable>
+                )}
               </View>
             </View>
           </View>
