@@ -61,6 +61,8 @@ export type Booking = {
   note: string;
   itemType: string | null;
   photos: string[];
+  /** Driver must collect a signature at dropoff. */
+  requireSignature?: boolean;
   createdAt: string;
   status: string;
   driverRating: number | null;
@@ -141,6 +143,7 @@ export type RequestBooking = {
   photos: string[];
   note: string;
   itemType: string | null;
+  requireSignature: boolean;
   voucherRewardId?: string;
 };
 

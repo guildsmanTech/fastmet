@@ -29,6 +29,7 @@ export default function PaymentMethod() {
   const routeData = useAppStore((state) => state.routeData);
   const {bookingType, setPaymentMethod} = useAppStore.getState();
   const [loading, setLoading] = useState(false);
+  const [requireSignature, setRequireSignature] = useState(false);
 
   // Voucher state
   const [showVoucherPicker, setShowVoucherPicker] = useState(false);
@@ -214,6 +215,7 @@ export default function PaymentMethod() {
         photos: uploadResult.images, // Cloudinary URLs
         note: note.trim(),
         itemType: itemType,
+        requireSignature,
         voucherRewardId: selectedVoucher?.reward._id, // Include voucher if selected
       };
 
@@ -303,6 +305,7 @@ export default function PaymentMethod() {
           note: state.note.trim(),
           itemType: state.itemType,
           photos: state.photos,
+          requireSignature,
           createdAt: new Date().toISOString(),
           status: "pending",
           driverRating: null,
@@ -372,7 +375,14 @@ export default function PaymentMethod() {
       socket.off("bookingRequestSaved", bookingSaved);
       clearSubmitTimeout();
     };
-  }, [id, setLoading, socket, bookingType?.type, selectedVoucher]);
+  }, [
+    id,
+    setLoading,
+    socket,
+    bookingType?.type,
+    selectedVoucher,
+    requireSignature,
+  ]);
 
   useEffect(() => {
     const handleBookingFailed = (data: {
@@ -495,7 +505,7 @@ export default function PaymentMethod() {
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: "white"}}>
       {/* header */}
-      <View className="relative flex-row justify-center items-center px-6 pt-2 pb-8">
+      <View className="relative flex-row items-center justify-center px-6 pt-2 pb-8">
         <Pressable
           className="absolute left-5 top-1.5"
           onPress={() => router.back()}
@@ -518,10 +528,10 @@ export default function PaymentMethod() {
         {selectedVoucher ? (
           <Pressable
             onPress={() => setShowVoucherPicker(true)}
-            className="flex-row items-center justify-between rounded-xl border border-green-500 bg-green-50 px-4 py-3"
+            className="flex-row items-center justify-between px-4 py-3 border border-green-500 rounded-xl bg-green-50"
           >
-            <View className="flex-1 flex-row gap-3 items-center">
-              <View className="justify-center items-center w-10 h-10 bg-green-100 rounded-full">
+            <View className="flex-row items-center flex-1 gap-3">
+              <View className="items-center justify-center w-10 h-10 bg-green-100 rounded-full">
                 <Ionicons name="ticket" size={24} color="#10B981" />
               </View>
               <View className="flex-1">
@@ -536,7 +546,7 @@ export default function PaymentMethod() {
             <Pressable
               onPress={handleRemoveVoucher}
               hitSlop={10}
-              className="ml-2 p-1"
+              className="p-1 ml-2"
             >
               <Ionicons name="close-circle" size={24} color="#EF4444" />
             </Pressable>
@@ -544,10 +554,10 @@ export default function PaymentMethod() {
         ) : (
           <Pressable
             onPress={() => setShowVoucherPicker(true)}
-            className="flex-row items-center justify-between rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 active:bg-gray-50"
+            className="flex-row items-center justify-between px-4 py-3 bg-white border border-gray-300 border-dashed rounded-xl active:bg-gray-50"
           >
-            <View className="flex-row gap-3 items-center">
-              <View className="justify-center items-center w-10 h-10 bg-orange-50 rounded-full">
+            <View className="flex-row items-center gap-3">
+              <View className="items-center justify-center w-10 h-10 rounded-full bg-orange-50">
                 <Ionicons name="ticket-outline" size={24} color="#FFA840" />
               </View>
               <View>
@@ -565,18 +575,18 @@ export default function PaymentMethod() {
 
         {/* Payment Method Group */}
         <View>
-          <Text className="text-xs font-semibold text-gray-500 uppercase mb-2 ml-1">
+          <Text className="mb-2 ml-1 text-xs font-semibold text-gray-500 uppercase">
             Payment Method
           </Text>
-          <View className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <View className="overflow-hidden bg-white border border-gray-200 rounded-xl">
             <Pressable
               onPress={() => setPaymentMethod("cash")}
               className={`flex-row items-center justify-between px-4 py-3 border-b border-gray-100 ${
                 paymentMethod === "cash" ? "bg-[#FFF6EB]" : "bg-white"
               }`}
             >
-              <View className="flex-row gap-3 items-center">
-                <View className="justify-center items-center w-10 h-10 bg-blue-50 rounded-full">
+              <View className="flex-row items-center gap-3">
+                <View className="items-center justify-center w-10 h-10 rounded-full bg-blue-50">
                   <Image
                     source={STATIC_IMAGES.cashPayment}
                     style={{width: 24, height: 24}}
@@ -603,8 +613,8 @@ export default function PaymentMethod() {
                 paymentMethod === "gcash" ? "bg-[#FFF6EB]" : "bg-white"
               }`}
             >
-              <View className="flex-row gap-3 items-center">
-                <View className="justify-center items-center w-10 h-10 bg-blue-50 rounded-full">
+              <View className="flex-row items-center gap-3">
+                <View className="items-center justify-center w-10 h-10 rounded-full bg-blue-50">
                   <Image
                     source={STATIC_IMAGES.gcash}
                     style={{width: 24, height: 24}}
@@ -626,6 +636,32 @@ export default function PaymentMethod() {
             </Pressable>
           </View>
         </View>
+
+        {/* Delivery confirmation */}
+        <Pressable
+          onPress={() => setRequireSignature((v) => !v)}
+          disabled={loading}
+          className="flex-row items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-xl active:bg-gray-50"
+        >
+          <View className="flex-row items-center flex-1 gap-3">
+            <View className="items-center justify-center w-10 h-10 rounded-full bg-orange-50">
+              <Ionicons name="create-outline" size={22} color="#FFA840" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-medium text-gray-800">
+                Require signature on delivery
+              </Text>
+              <Text className="text-xs text-gray-500">
+                Driver must get the receiver&apos;s signature to complete
+              </Text>
+            </View>
+          </View>
+          <Ionicons
+            name={requireSignature ? "checkbox" : "square-outline"}
+            size={24}
+            color={requireSignature ? "#FFA840" : "#9CA3AF"}
+          />
+        </Pressable>
       </View>
       <View
         className="z-30 gap-2 px-5 py-3 bg-white"
@@ -639,7 +675,7 @@ export default function PaymentMethod() {
       >
         {/* Fare Breakdown */}
         {routeData.basePrice > 0 && (
-          <View className="flex-row justify-between items-center">
+          <View className="flex-row items-center justify-between">
             <Text className="text-xs font-semibold text-gray-500">
               Base Fare
             </Text>
@@ -650,7 +686,7 @@ export default function PaymentMethod() {
         )}
 
         {routeData.distanceFee > 0 && (
-          <View className="flex-row justify-between items-center">
+          <View className="flex-row items-center justify-between">
             <Text className="text-xs font-semibold text-gray-500">
               Distance / Duration ({routeData.distance.toFixed(2)} km -{" "}
               {routeData.duration.toFixed(0)} min)
@@ -662,7 +698,7 @@ export default function PaymentMethod() {
         )}
 
         {routeData.serviceFee > 0 && (
-          <View className="flex-row justify-between items-center">
+          <View className="flex-row items-center justify-between">
             <Text className="text-xs font-semibold text-gray-500">
               Added Services ({useAppStore.getState().addedServices.length})
             </Text>
@@ -674,7 +710,7 @@ export default function PaymentMethod() {
 
         {/* Voucher Discount */}
         {selectedVoucher && (
-          <View className="flex-row justify-between items-center">
+          <View className="flex-row items-center justify-between">
             <Text className="text-xs font-semibold text-green-600">
               Voucher Discount
             </Text>
@@ -685,7 +721,7 @@ export default function PaymentMethod() {
         )}
 
         {/* Total / Amount to Pay */}
-        <View className="flex-row justify-between items-center mt-1">
+        <View className="flex-row items-center justify-between mt-1">
           <Text className="font-semibold">
             {selectedVoucher ? "Amount to Pay" : "Total Amount"}
           </Text>
@@ -698,7 +734,7 @@ export default function PaymentMethod() {
         </View>
 
         {selectedVoucher && (
-          <Text className="text-xs text-gray-500 text-right -mt-1">
+          <Text className="-mt-1 text-xs text-right text-gray-500">
             Original: Php {routeData.totalPrice.toFixed(2)}
           </Text>
         )}
