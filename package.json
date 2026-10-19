@@ -65,7 +65,6 @@
     "react-native-keyboard-aware-scroll-view": "^0.9.5",
     "react-native-keyboard-controller": "1.18.5",
     "react-native-maps": "1.20.1",
-    "react-native-maps-directions": "^1.9.0",
     "react-native-pager-view": "6.9.1",
     "react-native-popover-view": "^6.1.0",
     "react-native-reanimated": "~4.1.1",

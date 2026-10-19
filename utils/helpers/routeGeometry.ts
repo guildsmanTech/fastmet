@@ -136,10 +136,14 @@ export type DrivingRoute = {
   durationS: number;
 };
 
+const toWaypoint = (p: LatLng) => ({
+  location: {latLng: {latitude: p.latitude, longitude: p.longitude}},
+});
+
 /**
- * One Google Directions request (same API and key the app already used via
- * react-native-maps-directions). Callers must keep this to stage changes and
- * reroutes — it is billed per request.
+ * One Google Routes API request (computeRoutes, driving, traffic-unaware).
+ * Callers must keep this to stage changes and reroutes — it is billed per
+ * request.
  */
 export async function fetchDrivingRoute(
   origin: LatLng,
@@ -149,33 +153,45 @@ export async function fetchDrivingRoute(
 ): Promise<DrivingRoute | null> {
   if (!apiKey) return null;
 
-  const url =
-    "https://maps.googleapis.com/maps/api/directions/json" +
-    `?origin=${origin.latitude},${origin.longitude}` +
-    `&destination=${destination.latitude},${destination.longitude}` +
-    `&mode=driving&key=${encodeURIComponent(apiKey)}`;
-
-  const res = await fetch(url, {signal});
+  const res = await fetch(
+    "https://routes.googleapis.com/directions/v2:computeRoutes",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask":
+          "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
+      },
+      body: JSON.stringify({
+        origin: toWaypoint(origin),
+        destination: toWaypoint(destination),
+        travelMode: "DRIVE",
+        routingPreference: "TRAFFIC_UNAWARE",
+      }),
+      signal,
+    },
+  );
   if (!res.ok) return null;
 
+  // Empty body = no route. Zero-valued fields are omitted from the JSON.
   const json = (await res.json()) as {
-    status?: string;
     routes?: {
-      overview_polyline?: {points?: string};
-      legs?: {distance?: {value?: number}; duration?: {value?: number}}[];
+      distanceMeters?: number;
+      duration?: string;
+      polyline?: {encodedPolyline?: string};
     }[];
   };
   const route = json.routes?.[0];
-  const encoded = route?.overview_polyline?.points;
-  if (json.status !== "OK" || !route || !encoded) return null;
+  const encoded = route?.polyline?.encodedPolyline;
+  if (!route || !encoded) return null;
 
   const coordinates = decodePolyline(encoded);
   if (coordinates.length < 2) return null;
 
-  const legs = route.legs ?? [];
   return {
     coordinates,
-    distanceM: legs.reduce((sum, leg) => sum + (leg.distance?.value ?? 0), 0),
-    durationS: legs.reduce((sum, leg) => sum + (leg.duration?.value ?? 0), 0),
+    distanceM: route.distanceMeters ?? 0,
+    durationS: Number(route.duration?.replace(/s$/, "")) || 0,
   };
 }
