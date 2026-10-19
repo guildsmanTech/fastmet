@@ -1,3 +1,5 @@
+const isPreview = process.env.APP_VARIANT === "preview";
+
 export default {
   expo: {
     name: "FastMet",
@@ -100,6 +102,7 @@ export default {
           organization: "guildsman-technology",
         },
       ],
+      ...(isPreview ? ["./plugins/withChucker"] : []),
     ],
     experiments: {
       typedRoutes: true,
