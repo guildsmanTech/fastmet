@@ -1,6 +1,6 @@
 import {useMyRewards} from "@/queries/rewardQueries";
 import {Ionicons} from "@expo/vector-icons";
-import {ActivityIndicator, FlatList, Pressable, Text, View} from "react-native";
+import {ActivityIndicator, FlatList, Text, View} from "react-native";
 import VoucherCard from "./VoucherCard";
 
 export default function VoucherHistoryTab() {

@@ -72,7 +72,7 @@ export default Sentry.wrap(function RootLayout() {
       const data = await res.json();
       setPreRegActive(data?.isClientPreReg === true);
       setPreRegStatus("loaded");
-    } catch (e) {
+    } catch {
       setPreRegStatus("error");
     }
   };

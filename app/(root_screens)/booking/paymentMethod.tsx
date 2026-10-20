@@ -11,6 +11,7 @@ import {STATIC_IMAGES} from "@/utils/constants";
 import {generateBookingRef} from "@/utils/helpers/booking";
 import {isQuoteRedeemable} from "@/utils/helpers/quote";
 import {uploadBookingImages} from "@/utils/helpers/imagePicker";
+import {withNetworkRetry} from "@/utils/helpers/network";
 import {formatCurrency} from "@/utils/helpers/voucher";
 import {Ionicons} from "@expo/vector-icons";
 import {InfiniteData} from "@tanstack/react-query";
@@ -153,7 +154,7 @@ export default function PaymentMethod() {
       // stop here so the user sees the new total before confirming.
       if (!isQuoteRedeemable(useAppStore.getState())) {
         const previousTotal = useAppStore.getState().routeData.totalPrice;
-        const fresh = await requestFreshQuote();
+        const fresh = await withNetworkRetry(requestFreshQuote);
         const newTotal = fresh.routeData.totalPrice;
 
         if (newTotal !== previousTotal) {
@@ -176,7 +177,9 @@ export default function PaymentMethod() {
       lastBookingRefRef.current = bookingRef;
 
       // Upload images first
-      const uploadResult = await uploadBookingImages(photos, bookingRef);
+      const uploadResult = await withNetworkRetry(() =>
+        uploadBookingImages(photos, bookingRef),
+      );
 
       if (!uploadResult.success) {
         Toast.show({

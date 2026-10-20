@@ -267,8 +267,9 @@ export default function SearchingDriver() {
       if (!isPooling || !tripId) return;
       setWaitingForTripStart(false);
 
-      const distanceKm = (totalDistance / 1000).toFixed(1);
-      const durationMin = Math.round(totalDuration / 60);
+      // Server sends km and minutes.
+      const distanceKm = Number(totalDistance).toFixed(1);
+      const durationMin = Math.round(Number(totalDuration));
       const otherBookings = bookingCount - 1;
 
       Toast.show({

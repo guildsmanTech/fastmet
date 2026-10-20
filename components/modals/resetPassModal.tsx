@@ -14,6 +14,7 @@ const PasswordResetModal = ({visible, onClose, duration = 3000}: Props) => {
       const timer = setTimeout(onClose, duration);
       return () => clearTimeout(timer);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   return (
@@ -31,7 +32,7 @@ const PasswordResetModal = ({visible, onClose, duration = 3000}: Props) => {
             Email Sent
           </Text>
           <Text className="mb-5 text-base text-center text-gray-700">
-            We've sent a password reset link to your email. Please check your
+            We&apos;ve sent a password reset link to your email. Please check your
             inbox and follow the instructions.
           </Text>
           <Pressable

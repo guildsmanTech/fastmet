@@ -21,7 +21,7 @@ const PrivacyPolicy = () => {
       {error ? (
         <View className="flex-1 gap-3 justify-center items-center px-6">
           <Text className="text-gray-600">
-            Couldn't load. Check your connection.
+            Couldn&apos;t load. Check your connection.
           </Text>
           <Pressable
             onPress={() => {

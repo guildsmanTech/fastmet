@@ -6,7 +6,7 @@ import {useAppStore} from "@/store/useAppStore";
  * Call this at app root level to keep the count updated.
  */
 export const useNotificationCount = () => {
-  const {data, isLoading, error, refetch} = useUnreadNotificationCount();
+  const {isLoading, error, refetch} = useUnreadNotificationCount();
   const unreadNotificationCount = useAppStore(
     (state) => state.unreadNotificationCount,
   );

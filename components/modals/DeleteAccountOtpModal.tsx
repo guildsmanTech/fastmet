@@ -259,7 +259,7 @@ export default function DeleteAccountOtpModal({
 
           <View className="items-center">
             <Text className="mb-1 text-sm text-gray-500">
-              Didn't receive the code?
+              Didn&apos;t receive the code?
             </Text>
             {canResend ? (
               <Pressable

@@ -12,6 +12,7 @@ import Toast from "react-native-toast-message";
 
 export const apiUrl = `${process.env.EXPO_PUBLIC_BASE_URL}/api/client`;
 
+// eslint-disable-next-line import/no-named-as-default-member
 const api = axios.create({
   baseURL: apiUrl,
   headers: {"Content-Type": "application/json"},

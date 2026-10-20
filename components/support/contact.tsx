@@ -21,7 +21,7 @@ export default function ContactTab() {
           Contact Support
         </Text>
         <Text className="text-center text-gray-600">
-          We're here to help with any questions or concerns
+          We&apos;re here to help with any questions or concerns
         </Text>
       </View>
 

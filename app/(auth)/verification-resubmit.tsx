@@ -74,6 +74,7 @@ export default function VerificationResubmit() {
     };
 
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gender, isLoggedIn, name]);
 
   const captureImage = async (field: string) => {

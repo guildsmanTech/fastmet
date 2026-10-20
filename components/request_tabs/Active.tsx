@@ -114,6 +114,7 @@ export default function ActiveRoute() {
       socket.off("bookingCancelledByDriver", handleBookingCancelledByDriver);
       socket.off("poolingBookingCancelled", handlePoolingBookingCancelled);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, refetch]);
 
   if (isPending)

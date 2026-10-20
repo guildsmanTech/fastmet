@@ -174,7 +174,7 @@ export default function AboutScreen() {
       {/* Vision */}
       <Section title="Our vision" icon="eye">
         <Text className="text-sm font-semibold leading-6 text-brand-navy">
-          To become one of the Philippines' most trusted on-demand delivery
+          To become one of the Philippines&apos; most trusted on-demand delivery
           platforms, built on fast, fair, and reliable service.
         </Text>
         <Text className="mt-2 text-sm leading-6 text-neutral-600">
