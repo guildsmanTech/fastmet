@@ -2,7 +2,12 @@ import {
   useClaimPendingReward,
   useClaimPublicVoucher,
 } from "@/mutations/rewardMutation";
-import {useClaimableVouchers, useMyRewards} from "@/queries/rewardQueries";
+import {queryClient} from "@/lib/queryClient";
+import {
+  rewardKeys,
+  useClaimableVouchers,
+  useMyRewards,
+} from "@/queries/rewardQueries";
 import {IssuedReward, VoucherTemplate} from "@/types/voucher";
 import {getVoucherClaimErrorToast} from "@/utils/helpers/voucher";
 import {Ionicons} from "@expo/vector-icons";
@@ -15,6 +20,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import VoucherCard from "./VoucherCard";
 
 type ClaimableVoucherTabProps = {
@@ -72,6 +78,12 @@ export default function ClaimableVoucherTab({
     claimPublicMutation.mutate(
       {templateId},
       {
+        onError: (error) => {
+          const {title, message} = getVoucherClaimErrorToast(error, "template");
+          Toast.show({type: "error", text1: title, text2: message});
+          // The card is likely gone (claimed out / already yours): refresh lists.
+          void queryClient.invalidateQueries({queryKey: rewardKeys.all});
+        },
         onSettled: () => setClaimingId(null),
       },
     );

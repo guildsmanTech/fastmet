@@ -24,11 +24,10 @@ import Toast from "react-native-toast-message";
 export default function PaymentMethod() {
   const insets = useSafeAreaInsets();
   const paymentMethod = useAppStore((state) => state.paymentMethod);
-  const isLoading = useAppStore((state) => state.isLoading);
-
+  const loading = useAppStore((state) => state.isLoading);
+  const setLoading = useAppStore((state) => state.setLoading);
   const routeData = useAppStore((state) => state.routeData);
   const {bookingType, setPaymentMethod} = useAppStore.getState();
-  const [loading, setLoading] = useState(false);
   const [requireSignature, setRequireSignature] = useState(false);
 
   // Voucher state
@@ -80,7 +79,7 @@ export default function PaymentMethod() {
 
   const handleBookNow = async () => {
     // Immediate protection against rapid clicks (ref is synchronous, no render delay)
-    if (isSubmittingRef.current || isLoading) {
+    if (isSubmittingRef.current || loading) {
       return;
     }
 
@@ -389,7 +388,6 @@ export default function PaymentMethod() {
       message: string;
       code?: string;
       approvalStatus?: string;
-      voucherError?: boolean;
     }) => {
       clearSubmitTimeout();
       setLoading(false);
@@ -436,8 +434,9 @@ export default function PaymentMethod() {
         useAppStore.getState().resetQuote();
       }
 
-      // Handle voucher-specific errors
-      if (data.voucherError && selectedVoucher) {
+      // The voucher was rejected (used elsewhere, expired, below minimum...).
+      // The server released the quote, so the user can book again right away.
+      if (data.code === "VOUCHER_INVALID") {
         // Invalidate voucher queries to refresh the list
         void queryClient.invalidateQueries({queryKey: rewardKeys.all});
 

@@ -22,6 +22,8 @@ export type ConversationResponse = {
 export type MessageResponse = {
   _id: string;
   hasActiveBooking?: boolean;
+  /** Refs of the bookings this driver is working on for you, oldest first. */
+  activeBookingRefs?: string[];
   driver: {
     _id: string;
     firstName: string;

@@ -5,6 +5,7 @@ import {
   BookingETAUpdatedPayload,
   Driver,
   DriverLocationResponsePayload,
+  DriverQueue,
   LocationDetails,
 } from "@/types/book";
 import {GOOGLE_MAPS_API_KEY, STATIC_IMAGES} from "@/utils/constants";
@@ -49,6 +50,10 @@ type Props = {
   status: string;
   /** Pooling drivers make other stops first, so the direct-route ETA would be wrong. */
   isPooling?: boolean;
+  /** Priority bookings are always handled first, so their direct route stays right. */
+  isPriority?: boolean;
+  /** The rest of the driver's ASAP / scheduled work (other customers' stops stay private). */
+  driverQueue?: DriverQueue | null;
 };
 
 type DriverPoint = {lat: number; lng: number; at: number};
@@ -73,6 +78,8 @@ const MARKER_ANIMATION_MS = 1000;
 const TELEPORT_M = 2000;
 /** Ignore heading changes from sub-metre GPS jitter. */
 const MIN_HEADING_MOVE_M = 3;
+/** Shared driver: ask the server for a fresh ETA this often (server caps it too). */
+const SHARED_ETA_REFRESH_MS = 3 * 60 * 1000;
 
 const ROUTE_CASING = "#0052CC";
 const ROUTE_FILL = "#4D9FFF";
@@ -117,8 +124,19 @@ export default function LiveTrackingMapScreen({
   driver,
   status,
   isPooling = false,
+  isPriority = false,
+  driverQueue = null,
 }: Props) {
   const insets = useSafeAreaInsets();
+  // The driver also handles other customers' bookings: they may stop elsewhere
+  // first (and must, when a priority booking comes first). The direct route is
+  // then misleading and would keep triggering billed reroutes, so the server's
+  // ETA to this booking's next stop is used instead.
+  const waitingForPriority =
+    !isPooling && !isPriority && driverQueue?.waitingForPriority === true;
+  const sharedDriver =
+    !isPooling && !isPriority && (driverQueue?.otherActiveCount ?? 0) > 0;
+  const indirect = isPooling || sharedDriver;
   const mapRef = useRef<MapView>(null);
   const socket = useSocket();
   const getLiveEtaCache = useAppStore((state) => state.getLiveEtaCache);
@@ -306,12 +324,29 @@ export default function LiveTrackingMapScreen({
     }, [bookingId, getLiveEtaCache, setLiveEtaCache, socket]),
   );
 
+  // Shared driver: the ETA depends on the driver's other work. Ask again when
+  // that changes, and every few minutes while this screen is open.
+  const queueKey = sharedDriver
+    ? `${driverQueue?.otherActiveCount}:${waitingForPriority}`
+    : "";
+  useFocusEffect(
+    useCallback(() => {
+      if (!socket || !bookingId || !queueKey) return;
+      socket.emit("requestBookingETA", {bookingId});
+      const id = setInterval(() => {
+        socket.emit("requestBookingETA", {bookingId});
+      }, SHARED_ETA_REFRESH_MS);
+      return () => clearInterval(id);
+    }, [bookingId, queueKey, socket]),
+  );
+
   const driverLatLng = useMemo(
     () => (driverPoint ? toLatLng(driverPoint) : null),
     [driverPoint],
   );
 
-  const activeRoute = route && route.targetKey === targetKey ? route : null;
+  const activeRoute =
+    !indirect && route && route.targetKey === targetKey ? route : null;
 
   const progress = useMemo(
     () =>
@@ -324,9 +359,9 @@ export default function LiveTrackingMapScreen({
   // Decide when a (billed) Directions request is needed: no route for this
   // stage yet, or the driver has clearly left the drawn route.
   useEffect(() => {
-    // Pooling: the driver visits other passengers' stops first, so a direct
+    // Pooling / shared driver: the driver visits other stops first, so a direct
     // driver → this-booking route would be wrong (and keep triggering reroutes).
-    if (isPooling || !driverLatLng || !target) return;
+    if (indirect || !driverLatLng || !target) return;
 
     const sinceLast = Date.now() - lastRouteAttemptRef.current;
     const stageChanged = routeRequest?.targetKey !== targetKey;
@@ -361,7 +396,7 @@ export default function LiveTrackingMapScreen({
   }, [
     activeRoute,
     driverLatLng,
-    isPooling,
+    indirect,
     progress,
     routeRequest?.targetKey,
     target,
@@ -466,10 +501,11 @@ export default function LiveTrackingMapScreen({
   }, [cameraPoints, fitCamera]);
 
   const eta = useMemo(() => {
-    if (isPooling || !activeRoute || !progress) {
+    if (indirect || !activeRoute || !progress) {
       // Server ETA for "active" covers pickup + drop-off, so only use it
-      // when it matches what we show.
-      if (serverETA && (isPooling || status === "picked_up")) {
+      // when it matches what we show. A shared driver's server ETA ends at
+      // this booking's next stop.
+      if (serverETA && (indirect || status === "picked_up")) {
         return {km: serverETA.distance, min: serverETA.duration};
       }
       return null;
@@ -482,14 +518,16 @@ export default function LiveTrackingMapScreen({
       km: progress.remainingM / 1000,
       min: Math.max(1, Math.round((activeRoute.durationS * ratio) / 60)),
     };
-  }, [activeRoute, isPooling, progress, serverETA, status]);
+  }, [activeRoute, indirect, progress, serverETA, status]);
 
   const headline =
     status === "need_continuance"
       ? "Finding a replacement driver"
-      : status === "picked_up"
-        ? "On the way to drop-off"
-        : "Driver is heading to pickup";
+      : waitingForPriority
+        ? "Driver is finishing another delivery"
+        : status === "picked_up"
+          ? "On the way to drop-off"
+          : "Driver is heading to pickup";
 
   const isStale = !!driverPoint && now - driverPoint.at > STALE_AFTER_MS;
   const waitingForDriver = !driverPoint && status !== "need_continuance";
@@ -547,8 +585,9 @@ export default function LiveTrackingMapScreen({
             </>
           )}
           {/* Route not available yet: hint the direction with a dashed line */}
-          {/* Also the pooling line: direction only, since the driver may stop elsewhere first */}
-          {!progress && markerPoint && target && (
+          {/* Also the pooling / shared line: direction only, since the driver may stop elsewhere first */}
+          {/* Not while a priority delivery comes first: the driver is heading elsewhere */}
+          {!progress && markerPoint && target && !waitingForPriority && (
             <Polyline
               coordinates={[markerPoint, target]}
               strokeWidth={3}
@@ -606,11 +645,16 @@ export default function LiveTrackingMapScreen({
               Getting driver&apos;s location…
             </Text>
           ) : null}
-          {isPooling && status !== "need_continuance" && (
-            <Text className="mt-1 text-xs text-gray-500">
-              Your driver may make other stops first.
-            </Text>
-          )}
+          {status !== "need_continuance" &&
+            (waitingForPriority ? (
+              <Text className="mt-1 text-xs text-gray-500">
+                They&apos;ll head to you right after their priority delivery.
+              </Text>
+            ) : indirect ? (
+              <Text className="mt-1 text-xs text-gray-500">
+                Your driver may make other stops first.
+              </Text>
+            ) : null)}
           {(isStale || (!isLive && driverPoint)) && driverPoint && (
             <View className="flex-row gap-1 items-center mt-1">
               <Ionicons name="time-outline" size={13} color="#9CA3AF" />

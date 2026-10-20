@@ -1,5 +1,7 @@
+import DriverWorkloadNotice from "@/components/DriverWorkloadNotice";
 import LiveTrackingMapScreen from "@/components/maps/LiveTrackingMapScreen";
 import StarDisplay from "@/components/StarDisplay";
+import {describeDriverQueue} from "@/utils/helpers/driverWorkload";
 import { useShareRouteMutation } from "@/mutations/booking";
 import { useBooking } from "@/queries/bookingQueries";
 import {
@@ -186,6 +188,13 @@ export default function ViewOnMap() {
     !!booking.driver &&
     ["active", "picked_up", "need_continuance"].includes(booking.status);
 
+  // Other customers' stops are never shown; this says why the driver may not
+  // come straight here. Priority bookings are always handled first.
+  const driverQueueLabel =
+    booking.bookingType?.type === "pooling" || booking.isPriority
+      ? null
+      : describeDriverQueue(booking.driverQueue);
+
   const handleBack = () => {
     router.back();
     if (!shouldGoBack || shouldGoBack !== "true") {
@@ -209,6 +218,8 @@ export default function ViewOnMap() {
           driver={booking.driver!}
           status={booking.status}
           isPooling={booking.bookingType?.type === "pooling"}
+          isPriority={booking.isPriority === true}
+          driverQueue={booking.driverQueue}
         />
       </View>
       <View className="absolute right-0 bottom-0 left-0">
@@ -231,9 +242,15 @@ export default function ViewOnMap() {
             <Text className="text-lg font-semibold">
               {booking.status === "need_continuance"
                 ? "Finding a replacement"
-                : "On the way"}
+                : booking.driverQueue?.waitingForPriority
+                  ? "Finishing another delivery"
+                  : "On the way"}
             </Text>
           </View>
+
+          {booking.status !== "need_continuance" && driverQueueLabel && (
+            <DriverWorkloadNotice label={driverQueueLabel} />
+          )}
 
           <View>
             <Text className="mb-1 text-sm font-semibold text-gray-500">

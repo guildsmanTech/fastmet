@@ -55,6 +55,8 @@ const Message = () => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [canSendMessages, setCanSendMessages] = useState(false);
   const navigation = useNavigation();
+  // One chat covers every booking with this driver; name them when there are several.
+  const sharedRefs = conversation?.activeBookingRefs ?? [];
 
   useEffect(() => {
     if (conversation?.hasActiveBooking != null) {
@@ -538,6 +540,14 @@ const Message = () => {
                   />
                 ) : null}
               </View>
+              {canSendMessages && sharedRefs.length > 1 && (
+                <Text
+                  className="text-[11px] ml-0.5 text-[#FFA840]"
+                  numberOfLines={1}
+                >
+                  {sharedRefs.length} bookings · {sharedRefs.join(", ")}
+                </Text>
+              )}
             </View>
           </View>
 

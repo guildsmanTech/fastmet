@@ -1,5 +1,7 @@
 import DriverDetailsModal from "@/components/modals/driverDetailsModal";
+import DriverWorkloadNotice from "@/components/DriverWorkloadNotice";
 import {getBookingById, getBookingOffers} from "@/api/book";
+import {describeOfferWorkload} from "@/utils/helpers/driverWorkload";
 import {queryClient} from "@/lib/queryClient";
 import {useSocket} from "@/sockets/context/SocketProvider";
 import {useAppStore} from "@/store/useAppStore";
@@ -33,6 +35,15 @@ import Toast from "react-native-toast-message";
 
 const AnimatedView = cssInterop(Animated.View, {className: "style"});
 
+// Backend `error` titles for a failed accept/reject of one offer
+// (fastmet_backend/src/sockets/handlers/client/booking.ts)
+const OFFER_ERROR_TITLES = new Set([
+  "Offer unavailable",
+  "Driver unavailable",
+  "Driver busy",
+  "Could not join trip",
+]);
+
 const formatRadius = (km: number) => {
   if (km < 1) {
     return `${Math.round(km * 1000)}m`;
@@ -61,6 +72,11 @@ export default function SearchingDriver() {
   const [selectedDriver, setSelectedDriver] = useState<RequestedDriver | null>(
     null,
   );
+  // Read by the socket error handler without re-subscribing on every select
+  const selectedDriverRef = useRef(selectedDriver);
+  useEffect(() => {
+    selectedDriverRef.current = selectedDriver;
+  }, [selectedDriver]);
 
   console.log("SearchingDriver");
 
@@ -296,27 +312,6 @@ export default function SearchingDriver() {
       }
     };
 
-    const handleQueuedDriverAccepted = () => {
-      Toast.show({
-        type: "success",
-        text1: "Driver Queued! 🎉",
-        text2: "Your driver will come after finishing their current delivery.",
-        position: "top",
-        visibilityTime: 8_000,
-        swipeable: true,
-        topOffset: 50,
-      });
-      queryClient.invalidateQueries({queryKey: ["userBookingCounts"]});
-      queryClient.invalidateQueries({
-        queryKey: ["userBookings", "active"],
-        exact: false,
-      });
-      router.push({
-        pathname: "/(root_screens)/booking/viewOnMap",
-        params: {bookingId},
-      });
-    };
-
     const errorHandler = ({
       text1,
       text2,
@@ -326,6 +321,25 @@ export default function SearchingDriver() {
       text2?: string;
       message?: string;
     }) => {
+      // A failed accept only affects that offer; the search keeps going
+      if (text1 && OFFER_ERROR_TITLES.has(text1)) {
+        Toast.show({
+          type: "error",
+          text1,
+          text2: text2 || message,
+          position: "top",
+          visibilityTime: 5_000,
+          swipeable: true,
+          topOffset: 50,
+        });
+        const failedId = selectedDriverRef.current?.id;
+        setSelectedDriver(null);
+        if (failedId && text1 !== "Driver busy") {
+          setDrivers((prev) => prev.filter((d) => d.id !== failedId));
+        }
+        return;
+      }
+
       Toast.show({
         type: "error",
         text1: text1 || "Error",
@@ -419,7 +433,6 @@ export default function SearchingDriver() {
     socket.on("poolingOfferResult", handlePoolingOfferResult);
     socket.on("error", errorHandler);
     socket.on("bookingExpired", handleBookingExpired);
-    socket.on("queuedDriverAccepted", handleQueuedDriverAccepted);
 
     return () => {
       socket.off("bookingCancelled", handleBookingCancelled);
@@ -428,17 +441,18 @@ export default function SearchingDriver() {
       socket.off("poolingOfferResult", handlePoolingOfferResult);
       socket.off("error", errorHandler);
       socket.off("bookingExpired", handleBookingExpired);
-      socket.off("queuedDriverAccepted", handleQueuedDriverAccepted);
     };
   }, [socket, isPooling, bookingId]);
 
   // Driver offers listener — ASAP vs pooling use different events but same data shape
   useEffect(() => {
-    const handleAcceptanceRequest = (
-      data: RequestedDriver & {isQueued?: boolean},
-    ) => {
-      if (drivers.some((driver) => driver.id === data.id)) return;
-      setDrivers((prev) => [data, ...prev]);
+    const handleAcceptanceRequest = (data: RequestedDriver) => {
+      // Check against the latest list: two events can arrive before a re-render.
+      // A repeat offer from the same driver replaces the old card.
+      setDrivers((prev) => [
+        data,
+        ...prev.filter((driver) => driver.id !== data.id),
+      ]);
     };
 
     const event = isPooling
@@ -448,7 +462,7 @@ export default function SearchingDriver() {
     return () => {
       socket.off(event, handleAcceptanceRequest);
     };
-  }, [socket, drivers, isPooling]);
+  }, [socket, isPooling]);
 
   //SOCKETS LISTENER
   useEffect(() => {
@@ -580,9 +594,6 @@ export default function SearchingDriver() {
               selectedDriver={selectedDriver}
               setSelectedDriver={setSelectedDriver}
               isPooling={isPooling}
-              onPoolingAccepted={() => {
-                // Wait banner is set by poolingOfferResult (pre-trip only)
-              }}
             />
           )}
 
@@ -621,7 +632,6 @@ const DriverListCard = ({
   selectedDriver,
   setSelectedDriver,
   isPooling,
-  onPoolingAccepted,
 }: {
   drivers: RequestedDriver[];
   setDrivers: React.Dispatch<React.SetStateAction<RequestedDriver[]>>;
@@ -632,23 +642,21 @@ const DriverListCard = ({
     React.SetStateAction<RequestedDriver | null>
   >;
   isPooling: boolean;
-  onPoolingAccepted: () => void;
 }) => {
   const socket = useSocket();
-  const [areAllPaused, setAreAllPaused] = useState(false);
+  const selectedId = selectedDriver?.id;
+
+  // Server pauses this offer's TTL while its details are open
+  useEffect(() => {
+    if (!selectedId) return;
+    socket.emit("holdOffer", {driverId: selectedId, bookingId});
+    return () => {
+      socket.emit("releaseOffer", {driverId: selectedId, bookingId});
+    };
+  }, [selectedId, socket, bookingId]);
 
   const acceptDriver = useCallback(() => {
     if (!selectedDriver) return;
-
-    if (selectedDriver.isQueued) {
-      socket.emit("acceptQueuedDriver", {
-        driverId: selectedDriver.id,
-        bookingId,
-      });
-      setSelectedDriver(null);
-      setAreAllPaused(false);
-      return;
-    }
 
     if (isPooling) {
       socket.emit("acceptPoolingOffer", {
@@ -656,7 +664,6 @@ const DriverListCard = ({
         bookingId,
       });
       setSelectedDriver(null);
-      setAreAllPaused(false);
       // Wait UI / navigation come from poolingOfferResult + poolingTripStarted
     } else {
       socket.emit("acceptDriver", {
@@ -670,37 +677,23 @@ const DriverListCard = ({
   const rejectDriver = useCallback(() => {
     if (!selectedDriver) return;
 
-    if (selectedDriver.isQueued) {
-      socket.emit("declineQueuedDriver", {
-        driverId: selectedDriver.id,
-        bookingId,
-      });
-      setSelectedDriver(null);
-      setAreAllPaused(false);
-      setDrivers((prev) => prev.filter((d) => d.id !== selectedDriver.id));
-      return;
-    }
-
     socket.emit("rejectOffer", {
       driverId: selectedDriver.id,
       bookingId,
     });
     setSelectedDriver(null);
-    setAreAllPaused(false);
     setDrivers((prev) => prev.filter((d) => d.id !== selectedDriver.id));
   }, [selectedDriver, socket, bookingId, setSelectedDriver, setDrivers]);
 
   const handleDriverSelect = useCallback(
     (driver: RequestedDriver) => {
       setSelectedDriver(driver);
-      setAreAllPaused(true);
     },
     [setSelectedDriver],
   );
 
   const handleCloseModal = useCallback(() => {
     setSelectedDriver(null);
-    setAreAllPaused(false);
   }, [setSelectedDriver]);
 
   return (
@@ -732,7 +725,8 @@ const DriverListCard = ({
                 driver={driver}
                 onRemove={handleRemoveDriver}
                 onSelect={handleDriverSelect}
-                isPaused={areAllPaused} // All drivers get the same pause state
+                // Only the held offer pauses; the others keep the server's clock
+                isPaused={driver.id === selectedId}
                 showAvailability={!isPooling}
               />
             ))}
@@ -779,6 +773,13 @@ const DriverRow = memo(
         : 60_000;
     const remainingTimeRef = useRef(initialRemainingMs);
     const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+    // Live values read inside animation callbacks so startTimer stays stable
+    const isPausedRef = useRef(isPaused);
+    isPausedRef.current = isPaused;
+    const onRemoveRef = useRef(onRemove);
+    onRemoveRef.current = onRemove;
+    const entranceDoneRef = useRef(false);
+    const wasPausedRef = useRef(false);
 
     const startTimer = useCallback(
       (duration: number) => {
@@ -794,7 +795,7 @@ const DriverRow = memo(
         });
 
         animationRef.current.start(({finished}) => {
-          if (finished && !isPaused) {
+          if (finished && !isPausedRef.current) {
             // Trigger swipe-right removal animation
             Animated.parallel([
               Animated.timing(translateX, {
@@ -808,12 +809,12 @@ const DriverRow = memo(
                 useNativeDriver: true,
               }),
             ]).start(() => {
-              onRemove(driver.id);
+              onRemoveRef.current(driver.id);
             });
           }
         });
       },
-      [progressAnim, isPaused, translateX, opacity, onRemove, driver.id],
+      [progressAnim, translateX, opacity, driver.id],
     );
 
     useEffect(() => {
@@ -830,8 +831,10 @@ const DriverRow = memo(
           useNativeDriver: true,
         }),
       ]).start(() => {
-        // Start timer after entrance animation
-        startTimer(remainingTimeRef.current);
+        // Start timer after entrance animation (unless the modal is open;
+        // the resume effect starts it on close)
+        entranceDoneRef.current = true;
+        if (!isPausedRef.current) startTimer(remainingTimeRef.current);
       });
 
       return () => {
@@ -844,17 +847,16 @@ const DriverRow = memo(
     // Handle pause/resume based on isPaused prop
     useEffect(() => {
       if (isPaused) {
-        if (animationRef.current) {
+        wasPausedRef.current = true;
+        if (animationRef.current && entranceDoneRef.current) {
           animationRef.current.stop();
           // Calculate remaining time based on current progress
           const currentProgressValue = (progressAnim as any)._value;
           remainingTimeRef.current = (currentProgressValue / 100) * 60_000;
         }
-      } else {
-        // Resume if we have remaining time and we're not paused
-        if (remainingTimeRef.current < 60_000) {
-          startTimer(remainingTimeRef.current);
-        }
+      } else if (wasPausedRef.current && entranceDoneRef.current) {
+        wasPausedRef.current = false;
+        startTimer(remainingTimeRef.current);
       }
     }, [isPaused, progressAnim, startTimer]);
 
@@ -882,7 +884,7 @@ const DriverRow = memo(
         }}
       >
         <Pressable onPress={handlePress}>
-          <View className="relative flex-row justify-between items-center px-4 py-3 bg-gray-100 rounded-md">
+          <View className="relative px-4 pt-3 pb-4 w-full bg-gray-100 rounded-md">
             {/* Progress Bar (background) */}
             <View className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/5">
               <Animated.View
@@ -894,7 +896,7 @@ const DriverRow = memo(
               />
             </View>
 
-            {/* Left: Driver Info */}
+            {/* Top row: Driver Info + Distance */}
             <View className="flex-row gap-3 items-center">
               {driver.profilePicture ? (
                 <Image
@@ -906,49 +908,43 @@ const DriverRow = memo(
                 <Ionicons name="person-circle" size={40} color="#F7931E" />
               )}
 
-              <View>
-                <Text className="text-sm font-semibold text-gray-900 capitalize">
+              <View className="flex-1 min-w-0">
+                <Text
+                  className="text-sm font-semibold text-gray-900 capitalize"
+                  numberOfLines={1}
+                >
                   {driver.name}
                 </Text>
 
                 <View className="mt-0.5 flex-row items-center gap-1">
                   <Ionicons name="star" size={14} color="#FBBF24" />
-                  <Text className="text-xs text-gray-500">
+                  <Text className="flex-shrink text-xs text-gray-500" numberOfLines={1}>
                     {driver.rating} ({driver.totalBookings} bookings)
                   </Text>
                 </View>
-
-                {showAvailability && (
-                  <View
-                    className={`mt-1 self-start rounded-full px-2 py-0.5 ${
-                      driver.isQueued ? "bg-amber-100" : "bg-emerald-100"
-                    }`}
-                  >
-                    <Text
-                      className={`text-[10px] font-semibold ${
-                        driver.isQueued ? "text-amber-700" : "text-emerald-700"
-                      }`}
-                    >
-                      {driver.isQueued
-                        ? "Finishing a nearby delivery"
-                        : "Available now"}
-                    </Text>
-                  </View>
-                )}
               </View>
+
+              {typeof driver.distance === "number" && (
+                <View className="justify-center items-center px-3 py-2 bg-orange-500 rounded-xl shrink-0">
+                  <Text className="text-[10px] uppercase tracking-wide text-white">
+                    Approx. Distance
+                  </Text>
+                  <Text className="text-sm font-bold text-white">
+                    {driver.distance < 1
+                      ? `${(driver.distance * 1000).toFixed(0)}m`
+                      : `${driver.distance.toFixed(2)}km`}
+                  </Text>
+                </View>
+              )}
             </View>
 
-            {/* Right: Distance */}
-            {driver.distance && (
-              <View className="justify-center items-center px-3 py-2 bg-orange-500 rounded-xl">
-                <Text className="text-[10px] uppercase tracking-wide text-white">
-                  Approx. Distance
-                </Text>
-                <Text className="text-sm font-bold text-white">
-                  {driver.distance < 1
-                    ? `${(driver.distance * 1000).toFixed(0)}m`
-                    : `${driver.distance.toFixed(2)}km`}
-                </Text>
+            {/* Workload notice: own full-width row */}
+            {showAvailability && (
+              <View className="mt-2 w-full">
+                <DriverWorkloadNotice
+                  variant="pill"
+                  label={describeOfferWorkload(driver)}
+                />
               </View>
             )}
           </View>

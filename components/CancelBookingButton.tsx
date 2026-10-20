@@ -10,6 +10,8 @@ interface CancelBookingButtonProps {
   referenceTime: Date | null; // activeAt, scheduled start, or last completed stop time
   graceMinutes: number; // 50 for driver no-show
   onCancelled?: () => void;
+  /** Cancelling isn't possible yet for this reason (the timer hasn't started). */
+  blockedReason?: string | null;
 }
 
 export default function CancelBookingButton({
@@ -17,6 +19,7 @@ export default function CancelBookingButton({
   referenceTime,
   graceMinutes,
   onCancelled,
+  blockedReason,
 }: CancelBookingButtonProps) {
   const [isCancelling, setIsCancelling] = useState(false);
   const socket = useSocket();
@@ -85,13 +88,24 @@ export default function CancelBookingButton({
     );
   };
 
+  if (blockedReason) {
+    return (
+      <View className="px-5 py-3 bg-amber-50 border-t border-amber-100">
+        <View className="flex-row gap-2 items-center">
+          <Ionicons name="time-outline" size={20} color="#F59E0B" />
+          <Text className="flex-1 text-sm text-amber-700">{blockedReason}</Text>
+        </View>
+      </View>
+    );
+  }
+
   if (!canCancel) {
     return (
       <View className="px-5 py-3 bg-amber-50 border-t border-amber-100">
         <View className="flex-row gap-2 items-center">
           <Ionicons name="time-outline" size={20} color="#F59E0B" />
           <Text className="text-sm text-amber-700">
-            You can cancel if driver doesn't arrive in{" "}
+            You can cancel if driver doesn&apos;t arrive in{" "}
             <Text className="font-bold">
               {remainingMinutes}:{remainingSeconds.toString().padStart(2, "0")}
             </Text>

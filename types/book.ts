@@ -48,6 +48,12 @@ export type Booking = {
     type: string; // "asap" | "schedule"
     value: string;
   };
+  /** ASAP priority option: the driver handles it before their other bookings. */
+  isPriority?: boolean;
+  /** When the driver became free to work on this booking (null while behind a priority one). */
+  unlockedAt?: string | null;
+  /** In-progress bookings: the rest of the driver's work. Null when not applicable. */
+  driverQueue?: DriverQueue | null;
   selectedVehicle: {
     name: string;
     gasCategory?: GasCategory; // populated on read for active bookings (live tracking icon)
@@ -156,7 +162,23 @@ export type RequestedDriver = {
   distance?: number;
   profilePicture: string;
   bookingId?: string;
-  isQueued?: boolean;
+  /** Other deliveries the driver was handling when they offered (ASAP offers). */
+  activeBookingCount?: number;
+  /** The driver will finish a priority delivery before this booking. */
+  hasPriority?: boolean;
   /** Milliseconds left on the offer timer (from server clock). */
   remainingMs?: number;
+};
+
+/** Where a booking stands in its driver's work (in-progress ASAP / scheduled bookings). */
+export type DriverQueue = {
+  /** Other deliveries the same driver is handling. */
+  otherActiveCount: number;
+  /** The driver must finish a priority delivery before this one. */
+  waitingForPriority: boolean;
+};
+
+export type BookingQueueUpdatedPayload = {
+  bookingId: string;
+  driverQueue: DriverQueue;
 };

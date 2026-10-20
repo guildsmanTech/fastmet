@@ -1,4 +1,5 @@
 import CancelBookingButton from "@/components/CancelBookingButton";
+import DriverWorkloadNotice from "@/components/DriverWorkloadNotice";
 import { useBookingSettings } from "@/hooks/useBookingSettings";
 import useSeeMoreDetails from "@/hooks/useSeeMoreDetails";
 import { useUserBookings } from "@/queries/bookingQueries";
@@ -10,6 +11,7 @@ import { useSocket } from "@/sockets/context/SocketProvider";
 import { useAppStore } from "@/store/useAppStore";
 import { ActiveBooking, Driver } from "@/types/book";
 import { createConversationId } from "@/utils/helpers/booking";
+import { describeDriverQueue } from "@/utils/helpers/driverWorkload";
 import { formatLocation } from "@/utils/helpers/location";
 import { pushOnce } from "@/utils/helpers/navigation";
 import { Ionicons } from "@expo/vector-icons";
@@ -251,7 +253,16 @@ const ActiveCard = ({
     });
   };
 
-  const getReferenceTime = (): Date | null => {
+  const isPooling = bookingType.type === "pooling";
+  // A regular booking waits while its driver finishes a priority delivery.
+  const waitingForPriority =
+    !isPooling &&
+    booking.isPriority !== true &&
+    booking.driverQueue?.waitingForPriority === true;
+  const queueLabel =
+    isPooling || booking.isPriority ? null : describeDriverQueue(booking.driverQueue);
+
+  const getBaseReferenceTime = (): Date | null => {
     if (bookingType.type === "schedule") {
       return new Date(bookingType.value);
     }
@@ -264,6 +275,16 @@ const ActiveCard = ({
       return new Date(activeAt);
     }
     return null;
+  };
+
+  // Same rule as the server: the no-show wait counts from when the driver
+  // became free to come (after a priority delivery), whichever is later.
+  const getReferenceTime = (): Date | null => {
+    const base = getBaseReferenceTime();
+    if (isPooling || !booking.unlockedAt) return base;
+    const unlockedAt = new Date(booking.unlockedAt);
+    if (!base) return unlockedAt;
+    return unlockedAt.getTime() > base.getTime() ? unlockedAt : base;
   };
 
   return (
@@ -284,11 +305,21 @@ const ActiveCard = ({
         <Pressable onPress={onPressSeeMore} className="active:opacity-90">
           {/* Header */}
           <View className="flex-row justify-between items-center px-5 py-3 bg-lightPrimary">
-            <Text
-              className={`font-semibold text-white ${maxLoadKg ? "text-base" : "text-lg"}`}
-            >
-              {vehicle} {maxLoadKg ? `(${maxLoadKg}kg)` : ""}
-            </Text>
+            <View className="flex-row flex-1 gap-2 items-center">
+              <Text
+                className={`font-semibold text-white ${maxLoadKg ? "text-base" : "text-lg"}`}
+              >
+                {vehicle} {maxLoadKg ? `(${maxLoadKg}kg)` : ""}
+              </Text>
+              {booking.isPriority && (
+                <View className="flex-row gap-0.5 items-center px-2 py-0.5 bg-white rounded-full">
+                  <Ionicons name="flash" size={11} color="#ED8718" />
+                  <Text className="text-[10px] font-bold text-darkPrimary">
+                    PRIORITY
+                  </Text>
+                </View>
+              )}
+            </View>
             <Pressable
               className="flex-row gap-2 items-center active:scale-105"
               hitSlop={15}
@@ -315,6 +346,12 @@ const ActiveCard = ({
                 No action needed. Your price stays the same. We will assign a
                 new driver automatically.
               </Text>
+            </View>
+          )}
+
+          {booking.status !== "need_continuance" && queueLabel && (
+            <View className="px-4 pt-3">
+              <DriverWorkloadNotice variant="pill" label={queueLabel} />
             </View>
           )}
 
@@ -441,12 +478,20 @@ const ActiveCard = ({
           </View>
         </Pressable>
 
-        <CancelBookingButton
-          bookingId={id}
-          referenceTime={getReferenceTime()}
-          graceMinutes={driverNoShowMinutes}
-          onCancelled={onCancelled}
-        />
+        {/* Driver no-show cancel only applies before pickup (server rule). */}
+        {booking.status === "active" && (
+          <CancelBookingButton
+            bookingId={id}
+            referenceTime={getReferenceTime()}
+            graceMinutes={driverNoShowMinutes}
+            onCancelled={onCancelled}
+            blockedReason={
+              waitingForPriority
+                ? "Your driver is finishing a priority delivery first. The no-show timer starts once they head to you."
+                : null
+            }
+          />
+        )}
       </View>
     </View>
   );

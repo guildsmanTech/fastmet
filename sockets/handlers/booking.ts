@@ -1,7 +1,11 @@
 import {queryClient} from "@/lib/queryClient";
 import {useAppStore} from "@/store/useAppStore";
 import {useDriverLocationStore} from "@/store/useDriverLocationStore";
-import {Booking, RequestedDriver} from "@/types/book";
+import {
+  Booking,
+  BookingQueueUpdatedPayload,
+  RequestedDriver,
+} from "@/types/book";
 import {Notification} from "@/types/notification";
 import {updateNotificationHelper} from "@/utils/helpers/query";
 import {NOTIFICATION_TYPES} from "@/utils/notification";
@@ -504,6 +508,46 @@ export const bookingDriverReassigned = (socket: Socket) => {
   };
   socket.on("bookingDriverReassigned", handler);
   return () => socket.off("bookingDriverReassigned", handler);
+};
+
+/**
+ * The driver's other work changed (they took, finished or dropped a booking):
+ * patch this booking's queue info in the detail and active-list caches.
+ */
+export const bookingQueueUpdated = (socket: Socket) => {
+  const handler = ({bookingId, driverQueue}: BookingQueueUpdatedPayload) => {
+    if (!bookingId || !driverQueue) return;
+
+    queryClient.setQueryData<Booking>(["userBooking", bookingId], (old) =>
+      old ? {...old, driverQueue} : old,
+    );
+
+    queryClient.setQueriesData(
+      {queryKey: ["userBookings", "active"]},
+      (oldData: any) => {
+        if (!oldData?.pages) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: any) => ({
+            ...page,
+            bookings: page.bookings.map((booking: Booking) =>
+              booking._id === bookingId ? {...booking, driverQueue} : booking,
+            ),
+          })),
+        };
+      },
+    );
+
+    // An open chat lists the bookings shared with this driver; refresh it.
+    const {isInMessageScreen, activeConversationId} = useAppStore.getState();
+    if (isInMessageScreen && activeConversationId) {
+      void queryClient.invalidateQueries({
+        queryKey: ["conversation", activeConversationId],
+      });
+    }
+  };
+  socket.on("bookingQueueUpdated", handler);
+  return () => socket.off("bookingQueueUpdated", handler);
 };
 
 export const continuanceCancelledClient = (socket: Socket) => {

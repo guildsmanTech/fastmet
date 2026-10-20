@@ -12,6 +12,7 @@ import {
   bookingCompleted,
   bookingDriverReassigned,
   bookingNeedsContinuance,
+  bookingQueueUpdated,
   continuanceCancelledClient,
   cancelScheduleDriverOffer,
   driverArrivedAtDropoff,
@@ -106,6 +107,7 @@ export default function SocketProvider({
     const cleanupNeedsContinuance = bookingNeedsContinuance(socket);
     const cleanupDriverReassigned = bookingDriverReassigned(socket);
     const cleanupContinuanceCancelled = continuanceCancelledClient(socket);
+    const cleanupBookingQueueUpdated = bookingQueueUpdated(socket);
 
     return () => {
       socket.off("connect_error"); // Clean up the listener
@@ -122,6 +124,7 @@ export default function SocketProvider({
       cleanupNeedsContinuance();
       cleanupDriverReassigned();
       cleanupContinuanceCancelled();
+      cleanupBookingQueueUpdated();
       socket.disconnect();
     };
   }, [socket, token, updateBlocked]);
