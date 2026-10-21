@@ -1,22 +1,123 @@
 import {
   ACCOUNT_DEACTIVATED_ROUTE,
+  accountSuspendedRoute,
   DEVICE_BANNED_ROUTE,
 } from "@/constants/routes";
-import {getSocket} from "@/sockets/socket";
+import {queryClient} from "@/lib/queryClient";
+import {disconnectSocket} from "@/sockets/socket";
 import {useAppStore} from "@/store/useAppStore";
 import {versionHeaders} from "@/utils/appVersion";
 import {clearPushRegistrationCache} from "@/utils/helpers/pushRegistration";
-import axios, {InternalAxiosRequestConfig} from "axios";
-import {router} from "expo-router";
+import axios, {InternalAxiosRequestConfig, isAxiosError} from "axios";
+import {Href, router} from "expo-router";
 import Toast from "react-native-toast-message";
 
 export const apiUrl = `${process.env.EXPO_PUBLIC_BASE_URL}/api/client`;
+
+const REFRESH_TIMEOUT_MS = 15000;
+const LOGOUT_TIMEOUT_MS = 5000;
 
 // eslint-disable-next-line import/no-named-as-default-member
 const api = axios.create({
   baseURL: apiUrl,
   headers: {"Content-Type": "application/json"},
 });
+
+/**
+ * The server rejected the refresh token (401), or there is none: the login
+ * session is over. Any other refresh failure (offline, timeout, 5xx) is
+ * transient and must not log the user out.
+ */
+export class SessionExpiredError extends Error {
+  /** Ended because another device logged in to this account. */
+  readonly displaced: boolean;
+
+  constructor(displaced = false) {
+    super("Session expired");
+    this.name = "SessionExpiredError";
+    this.displaced = displaced;
+  }
+}
+
+const never = <T>() => new Promise<T>(() => {});
+
+type LogoutNotice = {title: string; message: string; visibilityTime?: number};
+
+const SESSION_EXPIRED_NOTICE: LogoutNotice = {
+  title: "Session Expired",
+  message: "Please log in again.",
+};
+
+const SESSION_DISPLACED_NOTICE: LogoutNotice = {
+  title: "Signed Out",
+  message: "Your account was signed in on another device.",
+  visibilityTime: 6000,
+};
+
+// --- Single logout ---
+// Concurrent 401s, socket errors and refresh failures all funnel here; only the
+// first caller tears down (one toast, one redirect), the rest share its promise.
+let activeLogoutPromise: Promise<void> | null = null;
+
+export const performLogout = (
+  redirectTo: Href = "/(auth)/auth",
+  notice?: LogoutNotice,
+): Promise<void> => {
+  if (activeLogoutPromise) return activeLogoutPromise;
+
+  activeLogoutPromise = (async () => {
+    if (notice) {
+      Toast.show({
+        type: "error",
+        text1: notice.title,
+        text2: notice.message,
+        position: "top",
+        visibilityTime: notice.visibilityTime ?? 4000,
+        swipeable: true,
+      });
+    }
+
+    const {token, refreshToken} = useAppStore.getState();
+    if (token || refreshToken) {
+      // Raw axios, not `api`: a 401 here must not re-enter the interceptor
+      // (that looped logout → refresh → logout forever). The refresh token
+      // lets the server revoke the session even if the access token expired.
+      // Not awaited so a slow network never delays the local logout.
+      void axios
+        .post(
+          `${apiUrl}/auth/logout`,
+          {refreshToken},
+          {
+            headers: {
+              ...(token && {Authorization: `Bearer ${token}`}),
+              ...versionHeaders(),
+            },
+            timeout: LOGOUT_TIMEOUT_MS,
+          },
+        )
+        .catch(() => {});
+    }
+
+    disconnectSocket();
+    await clearPushRegistrationCache().catch(() => {});
+    useAppStore.getState().logout();
+    queryClient.clear();
+    router.replace(redirectTo);
+  })().finally(() => {
+    activeLogoutPromise = null;
+  });
+
+  return activeLogoutPromise;
+};
+
+export const expireSession = () =>
+  performLogout(undefined, SESSION_EXPIRED_NOTICE);
+
+export const signOutDisplacedSession = () =>
+  performLogout(undefined, SESSION_DISPLACED_NOTICE);
+
+export const endSession = (reason: SessionExpiredError) =>
+  reason.displaced ? signOutDisplacedSession() : expireSession();
 
 // --- Shared refresh promise ---
 // A single in-flight promise shared by all callers (interceptor + socket).
@@ -28,49 +129,56 @@ export const ensureFreshToken = (): Promise<string> => {
   if (activeRefreshPromise) return activeRefreshPromise;
 
   const storedRefreshToken = useAppStore.getState().refreshToken;
-  if (!storedRefreshToken) return Promise.reject(new Error("No refresh token"));
+  if (!storedRefreshToken) return Promise.reject(new SessionExpiredError());
 
-  activeRefreshPromise = axios
-    .post<{accessToken: string; refreshToken: string}>(
-      `${apiUrl}/auth/refresh`,
-      {refreshToken: storedRefreshToken},
-      {headers: versionHeaders()},
-    )
-    .then(({data}) => {
+  activeRefreshPromise = (async () => {
+    try {
+      const {data} = await axios.post<{
+        accessToken: string;
+        refreshToken: string;
+      }>(
+        `${apiUrl}/auth/refresh`,
+        {refreshToken: storedRefreshToken},
+        {headers: versionHeaders(), timeout: REFRESH_TIMEOUT_MS},
+      );
+
+      // Logged out while the refresh was in flight: don't log back in.
+      if (useAppStore.getState().refreshToken !== storedRefreshToken) {
+        throw new Error("Session changed during refresh");
+      }
+
       useAppStore.getState().setAuthData({
         token: data.accessToken,
         refreshToken: data.refreshToken,
       });
       return data.accessToken;
-    })
-    .finally(() => {
+    } catch (error) {
+      // No response = offline/timeout: transient, keep the session.
+      if (!isAxiosError(error) || !error.response) throw error;
+
+      const {status, data} = error.response;
+
+      if (status === 403 && data?.accountDeactivated) {
+        await performLogout(ACCOUNT_DEACTIVATED_ROUTE);
+        return never<string>();
+      }
+
+      if (status === 403 && data?.accountSuspended) {
+        await performLogout(accountSuspendedRoute(data));
+        return never<string>();
+      }
+
+      if (status === 401) {
+        throw new SessionExpiredError(!!data?.sessionDisplaced);
+      }
+
+      throw error; // 5xx, 503 (retry), 429, ...: transient
+    } finally {
       activeRefreshPromise = null;
-    });
+    }
+  })();
 
   return activeRefreshPromise;
-};
-
-export const performLogout = async () => {
-  const store = useAppStore.getState();
-
-  // Fire-and-forget — don't let a network error block local logout
-  try {
-    const token = store.token;
-    if (token) {
-      await api.post("/auth/logout", null, {
-        headers: {Authorization: `Bearer ${token}`},
-      });
-    }
-  } catch {
-    // intentionally swallowed
-  }
-
-  const socket = getSocket("");
-  if (socket?.connected) socket.disconnect();
-
-  await clearPushRegistrationCache();
-  store.logout();
-  router.replace("/(auth)/auth");
 };
 
 // Attach access token to every request
@@ -109,71 +217,58 @@ api.interceptors.response.use(
     }
 
     if (status === 403 && data?.deviceBanned) {
-      const socket = getSocket("");
-      if (socket?.connected) socket.disconnect();
-      useAppStore.getState().logout();
-      router.replace(DEVICE_BANNED_ROUTE);
-      return new Promise(() => {});
+      await performLogout(DEVICE_BANNED_ROUTE);
+      return never();
     }
 
     if (status === 403 && data?.accountDeactivated) {
-      const socket = getSocket("");
-      if (socket?.connected) socket.disconnect();
-      useAppStore.getState().logout();
-      router.replace(ACCOUNT_DEACTIVATED_ROUTE);
-      return new Promise(() => {});
+      await performLogout(ACCOUNT_DEACTIVATED_ROUTE);
+      return never();
+    }
+
+    if (status === 403 && data?.accountSuspended) {
+      await performLogout(accountSuspendedRoute(data));
+      return never();
     }
 
     if (status === 401) {
+      // No session on this device (guest): nothing to expire.
+      if (!useAppStore.getState().token) return Promise.reject(error);
+
       // Session displaced — another device took over, no refresh attempt
       if (data?.sessionDisplaced) {
-        Toast.show({
-          type: "error",
-          text1: "Signed Out",
-          text2: "Your account was signed in on another device.",
-          position: "top",
-          visibilityTime: 6000,
-          swipeable: true,
-        });
-        await performLogout();
-        return new Promise(() => {});
+        await signOutDisplacedSession();
+        return never();
       }
 
-      // Access token expired — attempt refresh
-      if (data?.tokenExpired && !originalRequest._retry) {
+      // Access token expired — refresh once, then retry. The request
+      // interceptor attaches the current token on the retry.
+      if (data?.tokenExpired && originalRequest && !originalRequest._retry) {
         originalRequest._retry = true;
 
-        try {
-          const newToken = await ensureFreshToken();
-          originalRequest.headers.set("Authorization", `Bearer ${newToken}`);
+        // Another caller already refreshed since this request was sent.
+        const sentAuth = originalRequest.headers?.get?.("Authorization");
+        const current = useAppStore.getState().token;
+        if (current && sentAuth !== `Bearer ${current}`) {
           return api(originalRequest);
-        } catch {
-          Toast.show({
-            type: "error",
-            text1: "Session Expired",
-            text2: "Please log in again.",
-            position: "top",
-            visibilityTime: 4000,
-            swipeable: true,
-          });
+        }
 
-          await performLogout();
-          return new Promise(() => {});
+        try {
+          await ensureFreshToken();
+          return api(originalRequest);
+        } catch (refreshError) {
+          if (refreshError instanceof SessionExpiredError) {
+            await endSession(refreshError);
+            return never();
+          }
+          // Transient refresh failure: keep the session, fail this request.
+          return Promise.reject(refreshError);
         }
       }
 
-      // Any other 401 (e.g. truly invalid token) — hard logout
-      Toast.show({
-        type: "error",
-        text1: "Session Expired",
-        text2: "Please log in again.",
-        position: "top",
-        visibilityTime: 4000,
-        swipeable: true,
-      });
-
-      await performLogout();
-      return new Promise(() => {});
+      // Any other 401 (invalid token, account not found) — hard logout
+      await expireSession();
+      return never();
     }
 
     return Promise.reject(error);

@@ -377,6 +377,7 @@ const Settings = () => {
       await performLogout();
     } catch (error: any) {
       const message =
+        error.response?.data?.error ||
         error.response?.data?.message ||
         error.message ||
         "Failed to schedule account deletion";

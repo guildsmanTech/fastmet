@@ -1,11 +1,22 @@
+import {
+  ACCOUNT_DEACTIVATED_ROUTE,
+  accountSuspendedRoute,
+  DEVICE_BANNED_ROUTE,
+} from "@/constants/routes";
 import {useAuth} from "@/hooks/useAuth";
-import {ensureFreshToken, performLogout} from "@/lib/axios";
+import {
+  endSession,
+  ensureFreshToken,
+  expireSession,
+  performLogout,
+  SessionExpiredError,
+  signOutDisplacedSession,
+} from "@/lib/axios";
 import {useAppStore} from "@/store/useAppStore";
 import {runUpdateCheck} from "@/utils/helpers/appUpdateCheck";
 import {DefaultEventsMap} from "@socket.io/component-emitter";
 import React, {createContext, useContext, useEffect, useMemo} from "react";
 import {AppState} from "react-native";
-import Toast from "react-native-toast-message";
 import {Socket} from "socket.io-client";
 import {
   acceptanceRequestedSchedule,
@@ -23,6 +34,9 @@ import {
 } from "../handlers/booking";
 import {receiveMessage} from "../handlers/chat";
 import {getSocket} from "../socket";
+
+const SOCKET_RETRY_MIN_MS = 2000;
+const SOCKET_RETRY_MAX_MS = 30000;
 
 interface SocketContextValue {
   socket: Socket<DefaultEventsMap, DefaultEventsMap> | null;
@@ -57,40 +71,73 @@ export default function SocketProvider({
     };
     const appStateSub = AppState.addEventListener("change", onAppState);
 
+    let disposed = false;
     let refreshAttempted = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryDelay = SOCKET_RETRY_MIN_MS;
+
+    // Auth rejections stop socket.io's own reconnection, so after a transient
+    // refresh failure retry the handshake ourselves, with backoff.
+    const scheduleReconnect = () => {
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        if (!disposed && !socket.connected) socket.connect();
+      }, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, SOCKET_RETRY_MAX_MS);
+    };
+
+    const onConnect = () => {
+      retryDelay = SOCKET_RETRY_MIN_MS;
+    };
+    socket.on("connect", onConnect);
 
     socket.on("connect_error", async (err) => {
       console.error("🔌 Socket connection error:", err.message);
 
-      // Server-side version gate. Don't retry; the update check shows the modal.
-      if (err.message === "APP_UPDATE_REQUIRED") {
-        socket.disconnect();
-        void runUpdateCheck();
-        return;
+      switch (err.message) {
+        // Server-side version gate. Don't retry; the update check shows the modal.
+        case "APP_UPDATE_REQUIRED":
+          socket.disconnect();
+          void runUpdateCheck();
+          return;
+        // Same account guards as the HTTP API (see lib/axios.ts).
+        case "Session displaced":
+          void signOutDisplacedSession();
+          return;
+        case "Device banned":
+          void performLogout(DEVICE_BANNED_ROUTE);
+          return;
+        case "Account deactivated":
+          void performLogout(ACCOUNT_DEACTIVATED_ROUTE);
+          return;
+        case "Account suspended":
+          void performLogout(accountSuspendedRoute());
+          return;
+        case "Account not found":
+        case "Authentication required":
+          void expireSession();
+          return;
+        case "Authentication failed":
+          break;
+        default:
+          return; // transport error: socket.io reconnects on its own
       }
 
-      if (err.message !== "Authentication failed") return;
       if (refreshAttempted) return;
       refreshAttempted = true;
-
-      if (!useAppStore.getState().refreshToken) {
-        await performLogout();
-        return;
-      }
 
       try {
         await ensureFreshToken();
         // store updated inside ensureFreshToken → re-render → new socket with fresh token
-      } catch {
-        Toast.show({
-          type: "error",
-          text1: "Session Expired",
-          text2: "Please log in again.",
-          position: "top",
-          visibilityTime: 4000,
-          swipeable: true,
-        });
-        await performLogout();
+      } catch (refreshError) {
+        if (refreshError instanceof SessionExpiredError) {
+          void endSession(refreshError);
+          return;
+        }
+        // Transient (offline, 5xx): keep the session and try again later.
+        if (disposed) return;
+        refreshAttempted = false;
+        scheduleReconnect();
       }
     });
 
@@ -110,6 +157,9 @@ export default function SocketProvider({
     const cleanupBookingQueueUpdated = bookingQueueUpdated(socket);
 
     return () => {
+      disposed = true;
+      clearTimeout(retryTimer);
+      socket.off("connect", onConnect);
       socket.off("connect_error"); // Clean up the listener
       appStateSub.remove();
       cleanupReceiveMessage();
