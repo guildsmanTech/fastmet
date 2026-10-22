@@ -227,12 +227,14 @@ const ActiveCard = ({
     selectedVehicle: { name: vehicle, maxLoadKg = 0 },
     pickUp: pickup,
     dropOff: dropoff,
-    routeData: { distance, totalPrice: amount },
+    routeData: { distance, totalPrice },
     paymentMethod,
     driver,
     bookingType,
     activeAt,
   } = booking;
+  // Fare + tip: what the customer pays the driver.
+  const amount = totalPrice + (booking.tipAmount ?? 0);
 
   const isCash = paymentMethod === "cash";
 

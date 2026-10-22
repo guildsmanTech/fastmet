@@ -123,6 +123,7 @@ export const PaymentInfo = ({
   routeData,
   paidBy,
   voucherApplied,
+  tipAmount = 0,
 }: {
   paymentMethod: string;
   routeData: RouteData;
@@ -132,10 +133,13 @@ export const PaymentInfo = ({
     voucherTemplateId: string;
     discountAmount: number;
   } | null;
+  /** Tip for the driver, paid on top of the fare. */
+  tipAmount?: number;
 }) => {
-  const netAmount = voucherApplied
-    ? routeData.totalPrice - voucherApplied.discountAmount
-    : routeData.totalPrice;
+  const netAmount =
+    (voucherApplied
+      ? Math.max(0, routeData.totalPrice - voucherApplied.discountAmount)
+      : routeData.totalPrice) + tipAmount;
 
   return (
     <View className="p-5 bg-gray-50 rounded-2xl">
@@ -250,13 +254,28 @@ export const PaymentInfo = ({
           </>
         )}
 
+        {tipAmount > 0 && (
+          <View className="flex-row justify-between">
+            <Text className="text-xs font-medium text-green-700">
+              Tip for your driver
+            </Text>
+            <Text className="text-xs font-semibold text-green-700">
+              + Php{" "}
+              {tipAmount.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </Text>
+          </View>
+        )}
+
         {/* Divider */}
         <View className="my-2 h-px bg-gray-200" />
 
         {/* Total */}
         <View className="flex-row justify-between">
           <Text className="text-base font-semibold text-gray-800">
-            {voucherApplied ? "Amount" : "Total Amount"}
+            {voucherApplied || tipAmount > 0 ? "Amount to Pay" : "Total Amount"}
           </Text>
           <Text className="text-xl font-bold text-darkPrimary">
             Php{" "}

@@ -1,5 +1,9 @@
 import DriverDetailsModal from "@/components/modals/driverDetailsModal";
 import DriverWorkloadNotice from "@/components/DriverWorkloadNotice";
+import TipButton from "@/components/tip/TipButton";
+import TipSheet from "@/components/tip/TipSheet";
+import {useBookingSettings} from "@/hooks/useBookingSettings";
+import {useTipUpdate} from "@/hooks/useTipUpdate";
 import {getBookingById, getBookingOffers} from "@/api/book";
 import {describeOfferWorkload} from "@/utils/helpers/driverWorkload";
 import {queryClient} from "@/lib/queryClient";
@@ -108,6 +112,24 @@ export default function SearchingDriver() {
     selectedDriverRef.current = selectedDriver;
   }, [selectedDriver]);
 
+  // Tip: editable until a driver is chosen. While any offer is live the
+  // server only accepts raises, so the sheet does the same.
+  const {maxTip} = useBookingSettings();
+  const [tipAmount, setTipAmount] = useState(0);
+  const [tipSheetOpen, setTipSheetOpen] = useState(false);
+  const {submit: submitTip, pending: tipPending} = useTipUpdate(
+    bookingId,
+    (amount, source) => {
+      setTipAmount(amount);
+      if (source === "mine") setTipSheetOpen(false);
+    },
+  );
+  const tipLocked = drivers.length > 0;
+  const canEditTip = !waitingForTripStart && !isExiting;
+  useEffect(() => {
+    if (!canEditTip) setTipSheetOpen(false);
+  }, [canEditTip]);
+
   console.log("SearchingDriver");
 
   const resyncBookingState = useCallback(async () => {
@@ -132,6 +154,8 @@ export default function SearchingDriver() {
       if (booking.status === "pending" && isPooling) {
         setWaitingForTripStart(true);
       }
+
+      setTipAmount(booking.tipAmount ?? 0);
 
       setDrivers(
         (offersRes.offers ?? []).map((offer) => ({
@@ -611,6 +635,17 @@ export default function SearchingDriver() {
             />
           )}
 
+          {canEditTip && (
+            <View className="mt-3">
+              <TipButton
+                variant="dark"
+                tipAmount={tipAmount}
+                locked={tipLocked}
+                onPress={() => setTipSheetOpen(true)}
+              />
+            </View>
+          )}
+
           {/* Waiting for trip start banner — pooling only */}
           {isPooling && waitingForTripStart ? (
             <View className="flex-row gap-3 items-center px-4 py-3 mb-3 rounded-2xl border bg-green-500/20 border-green-500/40">
@@ -634,6 +669,16 @@ export default function SearchingDriver() {
           )}
         </View>
       </View>
+
+      <TipSheet
+        visible={tipSheetOpen}
+        currentTip={tipAmount}
+        maxTip={maxTip}
+        locked={tipLocked}
+        pending={tipPending}
+        onClose={() => setTipSheetOpen(false)}
+        onSubmit={submitTip}
+      />
     </ImageBackground>
   );
 }

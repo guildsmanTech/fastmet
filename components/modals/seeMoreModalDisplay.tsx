@@ -340,6 +340,7 @@ export default function SeeMoreModalDisplay({
             routeData={data.routeData}
             paidBy={data.paidBy}
             voucherApplied={data.voucherApplied}
+            tipAmount={data.tipAmount}
           />
 
           {/* Selected Services */}

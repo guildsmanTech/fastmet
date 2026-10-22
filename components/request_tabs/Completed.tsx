@@ -92,7 +92,7 @@ export default function CompletedRoute({ count }: { count: number }) {
             pickup={item.pickUp}
             dropoff={item.dropOff}
             distance={item.routeData.distance}
-            amount={item.routeData.totalPrice}
+            amount={item.routeData.totalPrice + (item.tipAmount ?? 0)}
             isCash={item.paymentMethod === "cash"}
             completedTime={item.completedAt}
             reportStatus={item.clientReport?.status ?? null}
@@ -583,6 +583,7 @@ function SeeMoreModal({
             routeData={data.routeData}
             paidBy={data.paidBy}
             voucherApplied={data.voucherApplied}
+            tipAmount={data.tipAmount}
           />
 
           {/* Delivery Proof Images */}

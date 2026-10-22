@@ -29,6 +29,10 @@ import DriverDetailsModal from "../modals/driverDetailsModal";
 import RescheduleModal from "../modals/rescheduleModal";
 import SeeMoreModalDisplay from "../modals/seeMoreModalDisplay";
 import StarDisplay from "../StarDisplay";
+import TipButton from "../tip/TipButton";
+import TipSheet from "../tip/TipSheet";
+import {useBookingSettings} from "@/hooks/useBookingSettings";
+import {useTipUpdate} from "@/hooks/useTipUpdate";
 
 export default function RequestRoute() {
   const {modalVisible, setModalVisible, selectedRequest, handleSeeMorePress} =
@@ -51,6 +55,16 @@ export default function RequestRoute() {
   );
   const socket = useSocket();
   const rescheduleMutation = useRescheduleBookingMutation();
+  const {maxTip} = useBookingSettings();
+  /** Pending scheduled booking whose tip sheet is open. */
+  const [tipBookingId, setTipBookingId] = useState<string | null>(null);
+  // Caches are patched by the global `tipUpdated` handler.
+  const {submit: submitTip, pending: tipPending} = useTipUpdate(
+    tipBookingId ?? undefined,
+    (_amount, source) => {
+      if (source === "mine") setTipBookingId(null);
+    },
+  );
 
   // Fetch first page of both statuses on mount
   const pendingQuery = useUserBookings("pending", 5);
@@ -75,6 +89,9 @@ export default function RequestRoute() {
     (b) => b._id === driversModalBookingId,
   );
   const driversForModal = driversModalBooking?.requestedDrivers ?? [];
+  const tipBooking = tipBookingId
+    ? pendingBookings.find((b) => b._id === tipBookingId)
+    : undefined;
 
   // Determine active queries for fetching / refreshing
   const activeQueries =
@@ -369,6 +386,16 @@ export default function RequestRoute() {
               dropoff={item.dropOff}
               distance={item.routeData.distance}
               amount={item.routeData.totalPrice}
+              tipAmount={item.tipAmount ?? 0}
+              // Scheduled bookings without a driver yet; ASAP / pooling tips
+              // are set on the searching screen.
+              onTip={
+                item.status === "pending" &&
+                item.bookingType.type === "schedule" &&
+                !item.driver
+                  ? () => setTipBookingId(item._id)
+                  : undefined
+              }
               isCash={item.paymentMethod === "cash"}
               awaitingDriverConfirm={awaitingDriverConfirm}
               confirmationExpiresAt={
@@ -417,7 +444,11 @@ export default function RequestRoute() {
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
           type="Request Booking"
-          data={selectedRequest}
+          // Latest cache copy, so a tip change shows while the modal is open.
+          data={
+            bookings.find((b) => b._id === selectedRequest._id) ??
+            selectedRequest
+          }
           onOpenDriverOffers={() => {
             setModalVisible(false);
             setSelectedDriver(null);
@@ -478,6 +509,17 @@ export default function RequestRoute() {
         }}
       />
 
+      <TipSheet
+        visible={!!tipBooking}
+        currentTip={tipBooking?.tipAmount ?? 0}
+        maxTip={maxTip}
+        // Scheduled offers stay until the customer answers them.
+        locked={(tipBooking?.requestedDrivers?.length ?? 0) > 0}
+        pending={tipPending}
+        onClose={() => setTipBookingId(null)}
+        onSubmit={submitTip}
+      />
+
       <DriversListModal
         visible={driversModalBookingId !== null && selectedDriver === null}
         drivers={driversForModal}
@@ -515,6 +557,9 @@ type RequestCardProps = {
   distance: number;
   isCash: boolean;
   amount: number;
+  tipAmount: number;
+  /** Opens the tip sheet; omitted when the tip can't be changed here. */
+  onTip?: () => void;
   onCancel: () => void;
   onReschedule: () => void;
   onPressSeeMore: () => void;
@@ -537,6 +582,8 @@ const RequestCard = ({
   distance,
   isCash,
   amount,
+  tipAmount,
+  onTip,
   onCancel,
   onReschedule,
   onPressSeeMore,
@@ -767,14 +814,31 @@ const RequestCard = ({
               <Text className="text-base text-gray-600">
                 {isCash ? "Cash Payment" : "Online Payment"}
               </Text>
-              <Text className="text-lg font-semibold text-darkPrimary">
-                Php{" "}
-                {amount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </Text>
+              <View className="items-end">
+                <Text className="text-lg font-semibold text-darkPrimary">
+                  Php{" "}
+                  {(amount + tipAmount).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+                {tipAmount > 0 && (
+                  <Text className="text-xs font-semibold text-green-700">
+                    incl. ₱{tipAmount.toLocaleString("en-US")} tip
+                  </Text>
+                )}
+              </View>
             </View>
+
+            {onTip && (
+              <View className="mt-4">
+                <TipButton
+                  tipAmount={tipAmount}
+                  locked={hasOffers}
+                  onPress={onTip}
+                />
+              </View>
+            )}
 
             {/* Buttons */}
             {(status === "pending" || status === "scheduled") && (

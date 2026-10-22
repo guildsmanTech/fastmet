@@ -35,6 +35,27 @@ export type DriverLocationResponsePayload = {
   ts?: number;
 };
 
+/** `tipUpdated`: the tip on one of the customer's bookings changed. */
+export type TipUpdatedPayload = {
+  bookingId: string;
+  tipAmount: number;
+  tipUpdatedAt: string | null;
+};
+
+/** `tipUpdateFailed`: the change was refused; `tipAmount` is the current tip when known. */
+export type TipUpdateFailedPayload = {
+  bookingId?: string;
+  code:
+    | "invalid_amount"
+    | "not_found"
+    | "closed"
+    | "locked"
+    | "too_fast"
+    | "server_error";
+  message: string;
+  tipAmount?: number;
+};
+
 export type BookingETAUpdatedPayload = {
   bookingId: string;
   distanceKm: number;
@@ -90,6 +111,9 @@ export type Booking = {
     voucherTemplateId: string;
     discountAmount: number;
   } | null;
+  /** Tip for the driver (whole pesos), paid on top of the fare. */
+  tipAmount?: number;
+  tipUpdatedAt?: string | null;
   /** Set on completed/cancelled lists when this client already filed a report. */
   clientReport?: {
     status: "pending" | "resolved" | "dismissed";

@@ -4,6 +4,8 @@ export type BookingSettingsSnapshot = {
   driverNoShowMinutes: number;
   clientNoShowMinutes: number;
   reportWindowDays: number;
+  /** Highest tip (whole pesos) the customer can add to one booking. */
+  maxTip: number;
 };
 
 export const BOOKING_SETTINGS_FALLBACK: BookingSettingsSnapshot = {
@@ -12,6 +14,7 @@ export const BOOKING_SETTINGS_FALLBACK: BookingSettingsSnapshot = {
   driverNoShowMinutes: 50,
   clientNoShowMinutes: 20,
   reportWindowDays: 5,
+  maxTip: 500,
 };
 
 export async function fetchBookingSettings(): Promise<BookingSettingsSnapshot> {
@@ -34,5 +37,6 @@ export async function fetchBookingSettings(): Promise<BookingSettingsSnapshot> {
       BOOKING_SETTINGS_FALLBACK.clientNoShowMinutes,
     reportWindowDays:
       settings.reportWindowDays ?? BOOKING_SETTINGS_FALLBACK.reportWindowDays,
+    maxTip: settings.maxTip ?? BOOKING_SETTINGS_FALLBACK.maxTip,
   };
 }

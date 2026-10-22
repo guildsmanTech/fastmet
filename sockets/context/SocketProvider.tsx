@@ -31,6 +31,7 @@ import {
   driverUnavailable,
   rescheduleDriverResponse,
   scheduledReminder,
+  tipUpdated,
 } from "../handlers/booking";
 import {receiveMessage} from "../handlers/chat";
 import {getSocket} from "../socket";
@@ -155,6 +156,7 @@ export default function SocketProvider({
     const cleanupDriverReassigned = bookingDriverReassigned(socket);
     const cleanupContinuanceCancelled = continuanceCancelledClient(socket);
     const cleanupBookingQueueUpdated = bookingQueueUpdated(socket);
+    const cleanupTipUpdated = tipUpdated(socket);
 
     return () => {
       disposed = true;
@@ -175,6 +177,7 @@ export default function SocketProvider({
       cleanupDriverReassigned();
       cleanupContinuanceCancelled();
       cleanupBookingQueueUpdated();
+      cleanupTipUpdated();
       socket.disconnect();
     };
   }, [socket, token, updateBlocked]);

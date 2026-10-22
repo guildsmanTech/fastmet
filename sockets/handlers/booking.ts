@@ -5,6 +5,7 @@ import {
   Booking,
   BookingQueueUpdatedPayload,
   RequestedDriver,
+  TipUpdatedPayload,
 } from "@/types/book";
 import {Notification} from "@/types/notification";
 import {updateNotificationHelper} from "@/utils/helpers/query";
@@ -548,6 +549,37 @@ export const bookingQueueUpdated = (socket: Socket) => {
   };
   socket.on("bookingQueueUpdated", handler);
   return () => socket.off("bookingQueueUpdated", handler);
+};
+
+/**
+ * The tip on one of this customer's bookings changed (from this device or
+ * another): patch it into the detail and pending-list caches.
+ */
+export const tipUpdated = (socket: Socket) => {
+  const handler = ({bookingId, tipAmount, tipUpdatedAt}: TipUpdatedPayload) => {
+    if (!bookingId || typeof tipAmount !== "number") return;
+    const patch = (booking: Booking) =>
+      booking._id === bookingId ? {...booking, tipAmount, tipUpdatedAt} : booking;
+
+    queryClient.setQueryData<Booking>(["userBooking", bookingId], (old) =>
+      old ? patch(old) : old,
+    );
+    queryClient.setQueriesData(
+      {queryKey: ["userBookings", "pending"]},
+      (oldData: any) => {
+        if (!oldData?.pages) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: any) => ({
+            ...page,
+            bookings: page.bookings.map(patch),
+          })),
+        };
+      },
+    );
+  };
+  socket.on("tipUpdated", handler);
+  return () => socket.off("tipUpdated", handler);
 };
 
 export const continuanceCancelledClient = (socket: Socket) => {
