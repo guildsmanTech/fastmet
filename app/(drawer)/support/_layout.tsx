@@ -1,21 +1,9 @@
 import HeaderDrawer from "@/components/headers/HeaderDrawer";
 import HeaderProfile from "@/components/headers/HeaderProfile";
-import {StackActions, useNavigation} from "@react-navigation/native";
 import {Stack} from "expo-router";
-import {useEffect} from "react";
 
+// The drawer's popToTopOnBlur resets this stack when Support loses focus.
 export default function SupportLayout() {
-  const navigation = useNavigation();
-
-  useEffect(() => {
-    const drawer = navigation.getParent();
-    if (!drawer) return;
-
-    return drawer.addListener("blur", () => {
-      navigation.dispatch(StackActions.popToTop());
-    });
-  }, [navigation]);
-
   return (
     <Stack
       initialRouteName="index"
@@ -36,15 +24,6 @@ export default function SupportLayout() {
         name="fileReport"
         options={{
           title: "File Report",
-          headerTitle: ({children}) => (
-            <HeaderProfile title={children} fallbackHref="/(drawer)/support" />
-          ),
-        }}
-      />
-      <Stack.Screen
-        name="reportDetail"
-        options={{
-          title: "Report Detail",
           headerTitle: ({children}) => (
             <HeaderProfile title={children} fallbackHref="/(drawer)/support" />
           ),

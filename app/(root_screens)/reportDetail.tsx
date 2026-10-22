@@ -131,7 +131,7 @@ export default function ReportDetailScreen() {
                 if (router.canGoBack()) {
                   router.back();
                 } else {
-                  router.replace("/(drawer)/support");
+                  router.dismissTo("/(drawer)/support");
                 }
               }}
               className="p-2 -ml-2"

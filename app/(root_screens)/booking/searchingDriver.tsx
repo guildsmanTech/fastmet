@@ -14,7 +14,7 @@ import {usePreventRemove} from "@react-navigation/native";
 import type {InfiniteData} from "@tanstack/react-query";
 import {Image, ImageBackground} from "expo-image";
 import {LinearGradient} from "expo-linear-gradient";
-import {router, useLocalSearchParams} from "expo-router";
+import {router, useLocalSearchParams, type Href} from "expo-router";
 import {cssInterop} from "nativewind";
 import React, {memo, useCallback, useEffect, useRef, useState} from "react";
 import {
@@ -67,7 +67,37 @@ export default function SearchingDriver() {
   const inset = useSafeAreaInsets();
   const [drivers, setDrivers] = useState<RequestedDriver[]>([]);
   const socket = useSocket();
-  const [shouldPrevent, setShouldPrevent] = useState(true);
+  // Leaving runs in an effect, after the render that turns off usePreventRemove.
+  // The first exit wins; later socket events or resyncs are ignored.
+  const [isExiting, setIsExiting] = useState(false);
+  const pendingExitRef = useRef<(() => void) | null>(null);
+  const leave = useCallback((navigate: () => void) => {
+    if (pendingExitRef.current) return;
+    pendingExitRef.current = navigate;
+    setIsExiting(true);
+  }, []);
+  useEffect(() => {
+    if (!isExiting || !pendingExitRef.current) return;
+    pendingExitRef.current();
+  }, [isExiting]);
+
+  // Pops the whole booking flow off the root stack, so back never returns to it
+  const exitToDrawer = useCallback(
+    (href: Href) => leave(() => router.dismissTo(href)),
+    [leave],
+  );
+  // Swaps this screen for the map (paymentMethod already dropped the setup
+  // screens). Back from the map goes to Request.
+  const exitToActiveMap = useCallback(
+    (id: string) =>
+      leave(() =>
+        router.replace({
+          pathname: "/(root_screens)/booking/viewOnMap",
+          params: {bookingId: id},
+        }),
+      ),
+    [leave],
+  );
   // Single modal state managed at parent level
   const [selectedDriver, setSelectedDriver] = useState<RequestedDriver | null>(
     null,
@@ -89,18 +119,13 @@ export default function SearchingDriver() {
       ]);
 
       if (booking.status === "active" || booking.status === "picked_up") {
-        setShouldPrevent(false);
-        router.replace({
-          pathname: "/(root_screens)/booking/viewOnMap",
-          params: {bookingId},
-        });
+        exitToActiveMap(bookingId);
         return;
       }
 
       if (booking.status === "cancelled" || booking.status === "completed") {
-        setShouldPrevent(false);
         useAppStore.getState().clearStates();
-        router.replace("/(drawer)/book");
+        exitToDrawer("/(drawer)/book");
         return;
       }
 
@@ -116,7 +141,6 @@ export default function SearchingDriver() {
       );
     } catch {
       // 404 = expired / deleted searching booking
-      setShouldPrevent(false);
       useAppStore.getState().clearStates();
       Toast.show({
         type: "error",
@@ -126,9 +150,9 @@ export default function SearchingDriver() {
         visibilityTime: 5_000,
         topOffset: 50,
       });
-      router.replace("/(drawer)/book");
+      exitToDrawer("/(drawer)/book");
     }
-  }, [bookingId, isPooling]);
+  }, [bookingId, isPooling, exitToActiveMap, exitToDrawer]);
 
   useEffect(() => {
     void resyncBookingState();
@@ -153,18 +177,18 @@ export default function SearchingDriver() {
   }, [socket, resyncBookingState]);
 
   // 1. Prevent screen removal (for both platforms)
-  usePreventRemove(shouldPrevent, () => null);
+  usePreventRemove(!isExiting, () => null);
   // 2. Android hardware back override
   useEffect(() => {
     if (Platform.OS !== "android") return;
 
     const backHandler = BackHandler.addEventListener(
       "hardwareBackPress",
-      () => shouldPrevent, // Only block if shouldPrevent is true
+      () => !isExiting, // Block until the screen leaves on its own
     );
 
     return () => backHandler.remove();
-  }, [shouldPrevent]);
+  }, [isExiting]);
 
   useEffect(() => {
     // Faster, smoother rotation for 2026 UI standards
@@ -213,9 +237,8 @@ export default function SearchingDriver() {
     const handleBookingCancelled = ({bookingId}: {bookingId: string}) => {
       // Clear driver location cache for this booking
       useDriverLocationStore.getState().clearDriverLocationCache(bookingId);
-      
-      router.replace("/(drawer)/(tabs)/request?tab=cancelled");
-      setShouldPrevent(false);
+
+      exitToDrawer("/(drawer)/(tabs)/request?tab=cancelled");
       useAppStore.getState().clearStates();
       Toast.show({
         type: "success",
@@ -246,10 +269,7 @@ export default function SearchingDriver() {
         queryKey: ["userBookings", "active"],
         exact: false,
       });
-      router.push({
-        pathname: "/(root_screens)/booking/viewOnMap",
-        params: {bookingId},
-      });
+      exitToActiveMap(bookingId);
     };
 
     // Pooling only — driver started the trip (pre-trip) or mid-trip join
@@ -293,10 +313,7 @@ export default function SearchingDriver() {
         exact: false,
       });
 
-      router.push({
-        pathname: "/(root_screens)/booking/viewOnMap",
-        params: {bookingId},
-      });
+      exitToActiveMap(bookingId);
     };
 
     const handlePoolingOfferResult = ({
@@ -351,7 +368,7 @@ export default function SearchingDriver() {
         topOffset: 50,
       });
       useAppStore.getState().clearStates();
-      router.push("/(drawer)/book");
+      exitToDrawer("/(drawer)/book");
     };
 
     const handleBookingExpired = ({
@@ -363,8 +380,6 @@ export default function SearchingDriver() {
       notification: Notification;
       unreadNotifications: number;
     }) => {
-      setShouldPrevent(false);
-
       // Invalidate voucher queries (voucher may have been released)
       queryClient.invalidateQueries({
         queryKey: ["rewards"],
@@ -423,9 +438,7 @@ export default function SearchingDriver() {
         unreadCount: unreadNotifications,
       });
 
-      setImmediate(() => {
-        router.replace("/(drawer)/book");
-      });
+      exitToDrawer("/(drawer)/book");
     };
 
     socket.on("bookingCancelled", handleBookingCancelled);
@@ -443,7 +456,7 @@ export default function SearchingDriver() {
       socket.off("error", errorHandler);
       socket.off("bookingExpired", handleBookingExpired);
     };
-  }, [socket, isPooling, bookingId]);
+  }, [socket, isPooling, bookingId, exitToActiveMap, exitToDrawer]);
 
   // Driver offers listener — ASAP vs pooling use different events but same data shape
   useEffect(() => {

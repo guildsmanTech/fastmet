@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   InteractionManager,
   Linking,
   Platform,
@@ -125,7 +126,7 @@ export default function ViewOnMap() {
     if (!leavingToCompleted) return;
 
     const task = InteractionManager.runAfterInteractions(() => {
-      router.replace("/(drawer)/(tabs)/request?tab=completed");
+      router.dismissTo("/(drawer)/(tabs)/request?tab=completed");
     });
 
     return () => task.cancel();
@@ -159,6 +160,26 @@ export default function ViewOnMap() {
       leaveToCompleted();
     }
   }, [booking?.status, leaveToCompleted, leavingToCompleted]);
+
+  // Opened from the Request tab (shouldGoBack): pop back to it. Otherwise this
+  // replaced the booking flow, so go to the Active tab instead.
+  const handleBack = useCallback(() => {
+    if (shouldGoBack === "true" && router.canGoBack()) {
+      router.back();
+    } else {
+      router.dismissTo("/(drawer)/(tabs)/request?tab=active");
+    }
+  }, [shouldGoBack]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+        handleBack();
+        return true;
+      });
+      return () => sub.remove();
+    }, [handleBack]),
+  );
 
   if (leavingToCompleted) {
     return (
@@ -195,13 +216,6 @@ export default function ViewOnMap() {
       ? null
       : describeDriverQueue(booking.driverQueue);
 
-  const handleBack = () => {
-    router.back();
-    if (!shouldGoBack || shouldGoBack !== "true") {
-      router.push("/(drawer)/(tabs)/request?tab=active");
-    }
-  };
-
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: "white" }}
@@ -229,7 +243,7 @@ export default function ViewOnMap() {
         >
           <View className="flex-row justify-center items-center px-4">
             <Pressable
-              onPress={handleBack} // TODO: infinite routing
+              onPress={handleBack}
               className="absolute left-0 -top-1"
               hitSlop={20}
             >

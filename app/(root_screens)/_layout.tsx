@@ -29,6 +29,12 @@ export default function RootScreenLayout() {
         }}
       />
       <Stack.Screen
+        name="reportDetail"
+        options={{
+          title: "Report Detail",
+        }}
+      />
+      <Stack.Screen
         name="booking"
         options={{
           title: "Book",

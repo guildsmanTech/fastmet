@@ -5,7 +5,7 @@ import {
   isDropOffAllowed,
   isWithinAllowedPickupBounds,
 } from "@/utils/constants";
-import {deriveDefaultBookingType, resolveModifier} from "@/utils/helpers/bookingType";
+import {deriveDefaultBookingType} from "@/utils/helpers/bookingType";
 import {StateCreator} from "zustand";
 import {BookingTypeSlice} from "./bookingTypeSlice";
 import {LoadingSlice} from "./loadingStore";
@@ -15,7 +15,6 @@ export type Type = "asap" | "pooling" | "schedule";
 export type BookingType = {
   type: Type;
   value: string;
-  priceModifier: number; // resolved from DB config at selection time
 };
 
 export interface BookSlice {
@@ -85,6 +84,8 @@ const EMPTY_ROUTE_DATA: RouteData = {
   duration: 0,
   basePrice: 0,
   distanceFee: 0,
+  bookingTypeFee: 0,
+  surgeFee: 0,
   serviceFee: 0,
   totalPrice: 0,
   surgeMultiplier: 1.0,
@@ -204,8 +205,7 @@ export const createBookSlice: StateCreator<
   },
 
   setBookingType: ({type, value}) => {
-    const priceModifier = resolveModifier(get().bookingTypes, type, value);
-    set({bookingType: {type, value, priceModifier}});
+    set({bookingType: {type, value}});
   },
 
   setSelectedVehicle: (vehicle) => set({selectedVehicle: vehicle}),

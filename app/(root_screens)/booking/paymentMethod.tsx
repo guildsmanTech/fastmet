@@ -9,6 +9,7 @@ import {Booking, RequestBooking} from "@/types/book";
 import {IssuedReward} from "@/types/voucher";
 import {STATIC_IMAGES} from "@/utils/constants";
 import {generateBookingRef} from "@/utils/helpers/booking";
+import {getBookingOptionName} from "@/utils/helpers/bookingType";
 import {isQuoteRedeemable} from "@/utils/helpers/quote";
 import {uploadBookingImages} from "@/utils/helpers/imagePicker";
 import {withNetworkRetry} from "@/utils/helpers/network";
@@ -29,6 +30,8 @@ export default function PaymentMethod() {
   const setLoading = useAppStore((state) => state.setLoading);
   const routeData = useAppStore((state) => state.routeData);
   const {bookingType, setPaymentMethod} = useAppStore.getState();
+  const bookingTypes = useAppStore((state) => state.bookingTypes);
+  const bookingOptionName = getBookingOptionName(bookingTypes, bookingType);
   const [requireSignature, setRequireSignature] = useState(false);
 
   // Voucher state
@@ -327,8 +330,10 @@ export default function PaymentMethod() {
         if (
           state.bookingType.type === "asap" ||
           state.bookingType.type === "pooling"
-        )
-          router.push({
+        ) {
+          // Drop the setup screens so back can't return to a submitted booking
+          if (router.canDismiss()) router.dismissAll();
+          router.replace({
             pathname: "/(root_screens)/booking/searchingDriver",
             params: {
               bookingId: data.bookingId,
@@ -336,7 +341,7 @@ export default function PaymentMethod() {
               city: data.city,
             },
           });
-        else {
+        } else {
           Toast.show({
             type: data.noDriversOnline ? "info" : "success",
             text1: data.noDriversOnline
@@ -351,7 +356,7 @@ export default function PaymentMethod() {
           queryClient.invalidateQueries({
             queryKey: ["userBookingCounts"],
           });
-          router.replace("/(drawer)/(tabs)/request");
+          router.dismissTo("/(drawer)/(tabs)/request");
 
           // Prepend to pending cache so the Request tab shows it immediately
           queryClient.setQueriesData<
@@ -651,10 +656,10 @@ export default function PaymentMethod() {
             </View>
             <View className="flex-1">
               <Text className="text-sm font-medium text-gray-800">
-                Require signature on delivery
+                Delivery Signature
               </Text>
               <Text className="text-xs text-gray-500">
-                Driver must get the receiver&apos;s signature to complete
+                Require receiver&apos;s signature at drop-off.
               </Text>
             </View>
           </View>
@@ -675,6 +680,15 @@ export default function PaymentMethod() {
           paddingBottom: insets.bottom + 10,
         }}
       >
+        {(routeData.surgeFee ?? 0) > 0 && (
+          <View className="flex-row items-center gap-2 px-3 py-2 mb-1 rounded-lg bg-orange-50">
+            <Ionicons name="trending-up-outline" size={16} color="#ED8718" />
+            <Text className="flex-1 text-xs text-darkPrimary">
+              Prices are a bit higher right now due to high demand.
+            </Text>
+          </View>
+        )}
+
         {/* Fare Breakdown */}
         {routeData.basePrice > 0 && (
           <View className="flex-row items-center justify-between">
@@ -695,6 +709,34 @@ export default function PaymentMethod() {
             </Text>
             <Text className="text-xs font-semibold text-gray-500">
               Php {routeData.distanceFee.toFixed(2)}
+            </Text>
+          </View>
+        )}
+
+        {!!routeData.bookingTypeFee && (
+          <View className="flex-row items-center justify-between">
+            <Text
+              className={`text-xs font-semibold ${routeData.bookingTypeFee < 0 ? "text-green-600" : "text-gray-500"}`}
+            >
+              {bookingOptionName ?? "Booking Option"}{" "}
+              {routeData.bookingTypeFee < 0 ? "Discount" : "Fee"}
+            </Text>
+            <Text
+              className={`text-xs font-semibold ${routeData.bookingTypeFee < 0 ? "text-green-600" : "text-gray-500"}`}
+            >
+              {routeData.bookingTypeFee < 0 ? "- " : ""}Php{" "}
+              {Math.abs(routeData.bookingTypeFee).toFixed(2)}
+            </Text>
+          </View>
+        )}
+
+        {(routeData.surgeFee ?? 0) > 0 && (
+          <View className="flex-row items-center justify-between">
+            <Text className="text-xs font-semibold text-gray-500">
+              High Demand Fee
+            </Text>
+            <Text className="text-xs font-semibold text-gray-500">
+              Php {(routeData.surgeFee ?? 0).toFixed(2)}
             </Text>
           </View>
         )}

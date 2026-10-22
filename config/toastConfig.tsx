@@ -21,7 +21,7 @@ export const toastConfig = {
       <Pressable
         onPress={() => {
           Toast.hide();
-          router.push("/(drawer)/(tabs)/request?tab=active"); // Navigate to requests tab
+          router.dismissTo("/(drawer)/(tabs)/request?tab=active"); // Navigate to requests tab
         }}
         className="bg-primary px-4 py-2 rounded-lg ml-3"
       >

@@ -175,6 +175,40 @@ export const PaymentInfo = ({
           </Text>
         </View>
 
+        {!!routeData.bookingTypeFee && (
+          <View className="flex-row justify-between">
+            <Text
+              className={`text-xs ${routeData.bookingTypeFee < 0 ? "font-medium text-green-600" : "text-gray-500"}`}
+            >
+              {routeData.bookingTypeFee < 0
+                ? "Booking Option Discount"
+                : "Booking Option Fee"}
+            </Text>
+            <Text
+              className={`text-xs font-semibold ${routeData.bookingTypeFee < 0 ? "text-green-600" : "text-gray-700"}`}
+            >
+              {routeData.bookingTypeFee < 0 ? "- " : ""}Php{" "}
+              {Math.abs(routeData.bookingTypeFee).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </Text>
+          </View>
+        )}
+
+        {(routeData.surgeFee ?? 0) > 0 && (
+          <View className="flex-row justify-between">
+            <Text className="text-xs text-gray-500">High Demand Fee</Text>
+            <Text className="text-xs font-semibold text-gray-700">
+              Php{" "}
+              {(routeData.surgeFee ?? 0).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </Text>
+          </View>
+        )}
+
         <View className="flex-row justify-between">
           <Text className="text-xs text-gray-500">Service Fee</Text>
           <Text className="text-xs font-semibold text-gray-700">

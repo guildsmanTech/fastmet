@@ -17,6 +17,10 @@ export type RouteData = {
   duration: number;
   basePrice: number;
   distanceFee: number;
+  /** Booking type modifier amount on base + distance. Negative = discount. Absent on older bookings. */
+  bookingTypeFee?: number;
+  /** Amount added by high demand (surge). 0 or absent when there is no surge. */
+  surgeFee?: number;
   serviceFee: number;
   totalPrice: number;
   surgeMultiplier?: number; // optional — only present when pricing is active

@@ -180,7 +180,7 @@ function ReportCard({report}: {report: Report}) {
     <Pressable
       onPress={() =>
         router.push({
-          pathname: "/(drawer)/support/reportDetail",
+          pathname: "/(root_screens)/reportDetail",
           params: {reportId: report._id},
         })
       }

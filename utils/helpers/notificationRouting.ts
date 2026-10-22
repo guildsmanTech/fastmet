@@ -34,7 +34,7 @@ export function navigateToReportDetail(reportId: string): void {
   setTimeout(() => {
     try {
       pushOnce({
-        pathname: "/(drawer)/support/reportDetail",
+        pathname: "/(root_screens)/reportDetail",
         params: {reportId},
       });
     } catch {
