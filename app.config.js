@@ -48,6 +48,8 @@ export default {
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "NOTIFICATIONS",
+        // Face verification webview (getUserMedia).
+        "CAMERA",
       ],
       blockedPermissions: [
         "android.permission.READ_MEDIA_IMAGES",

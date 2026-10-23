@@ -1,8 +1,18 @@
 import {UserAddress} from "@/types/user";
 import {GOOGLE_MAPS_API_KEY} from "@/utils/constants";
 import {Ionicons} from "@expo/vector-icons";
+import * as Location from "expo-location";
 import React, {useCallback, useEffect, useRef, useState} from "react";
-import {Pressable, Text, TextInput, View} from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import GooglePlacesTextInput, {
   GooglePlacesTextInputRef,
   Place,
@@ -194,6 +204,75 @@ export default function AddressInput({
     setIsSearching(true);
   }, []);
 
+  const [locating, setLocating] = useState(false);
+
+  const handleUseCurrentLocation = useCallback(async () => {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const {status} = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Location permission needed",
+          "Allow location access to use your current location as your address.",
+          [
+            {text: "Cancel", style: "cancel"},
+            {
+              text: "Open Settings",
+              onPress: () => {
+                if (Platform.OS === "ios") Linking.openURL("app-settings:");
+                else Linking.openSettings();
+              },
+            },
+          ],
+        );
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const {latitude: lat, longitude: lng} = position.coords;
+
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`,
+      );
+      const data = await response.json();
+      const result = data.results?.[0];
+      if (!result) {
+        Alert.alert(
+          "Address not found",
+          "We couldn't find an address for your location. Please search for it instead.",
+        );
+        return;
+      }
+
+      const parsed = parseAddressComponents(result.address_components);
+      const newFields: AddressFields = {
+        street: parsed.street || "",
+        barangay: parsed.barangay || "",
+        city: parsed.city || "",
+        province: parsed.province || "",
+      };
+      const newCoords = {lat, lng};
+      const name = "Current Location";
+
+      autocompleteRef.current?.clear();
+      setFields(newFields);
+      setPlaceName(name);
+      setCoords(newCoords);
+      setHasSelected(true);
+      setIsSearching(false);
+      initializedRef.current = true;
+      buildAddress(newFields, name, newCoords);
+    } catch (error) {
+      console.error("Error getting current location:", error);
+      Alert.alert("Error", "Failed to get your current location.");
+    } finally {
+      setLocating(false);
+    }
+  }, [locating, buildAddress]);
+
   if (!GOOGLE_MAPS_API_KEY) {
     return (
       <View className="gap-2">
@@ -281,6 +360,42 @@ export default function AddressInput({
             </View>
           </View>
         </View>
+      )}
+
+      {/* Use current location - shown alongside the search box */}
+      {(isSearching || !hasSelected) && (
+        <>
+          <View className="flex-row items-center gap-3">
+            <View className="flex-1 h-px bg-gray-200" />
+            <Text className="text-xs font-medium text-gray-400">OR</Text>
+            <View className="flex-1 h-px bg-gray-200" />
+          </View>
+
+          <Pressable
+            onPress={handleUseCurrentLocation}
+            disabled={locating}
+            className="flex-row items-center p-3 border border-amber-200 rounded-xl bg-amber-50 active:bg-amber-100"
+          >
+            <View className="items-center justify-center mr-3 rounded-full w-10 h-10 bg-amber-500">
+              {locating ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="locate" size={20} color="#FFFFFF" />
+              )}
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-gray-900">
+                {locating ? "Getting your location..." : "Use my current location"}
+              </Text>
+              <Text className="text-xs text-gray-500 mt-0.5">
+                Auto-fill your address using GPS
+              </Text>
+            </View>
+            {!locating && (
+              <Ionicons name="chevron-forward" size={20} color="#F59E0B" />
+            )}
+          </Pressable>
+        </>
       )}
 
       {/* Structured fields - shown when address is selected */}

@@ -11,7 +11,7 @@ import { getDeviceId } from "@/utils/helpers/deviceId";
 import { formatPHNumber } from "@/utils/helpers/format";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
-import { router } from "expo-router";
+import { Href, router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -286,25 +286,16 @@ export default function PhoneOTPScreen() {
         } else if (step < 3) {
           Toast.show({
             type: "info",
-            text1: "ID verification required to book",
-            text2: "Submit your ID when you are ready.",
+            text1: "Face verification required to book",
+            text2: "Verify your face when you are ready.",
             position: "top",
             visibilityTime: 5_000,
             swipeable: true,
             topOffset: 50,
           });
-          router.replace("/(auth)/id-verification");
+          router.replace("/(auth)/face-verification" as Href);
         } else if (status === "rejected") {
-          Toast.show({
-            type: "error",
-            text1: "Verification rejected",
-            text2: "Please resubmit your documents to book.",
-            position: "top",
-            visibilityTime: 5_000,
-            swipeable: true,
-            topOffset: 50,
-          });
-          router.replace("/(auth)/verification-resubmit");
+          router.replace("/(auth)/verification-rejected" as Href);
         } else {
           Toast.show({
             type: "info",

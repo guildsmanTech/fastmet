@@ -1,3 +1,4 @@
+import ImageViewer from "@/components/ImageViewer";
 import NotLoggedIn from "@/components/notLoggedIn";
 import {PreRegBadge} from "@/components/PreRegBadge";
 import {useAuth} from "@/hooks/useAuth";
@@ -6,7 +7,7 @@ import {formatPHNumber} from "@/utils/helpers/format";
 import {pushOnce} from "@/utils/helpers/navigation";
 import {Ionicons} from "@expo/vector-icons";
 import {Image} from "expo-image";
-import React from "react";
+import React, {useState} from "react";
 import {Pressable, ScrollView, Text, View} from "react-native";
 
 export default function MyProfile() {
@@ -15,16 +16,12 @@ export default function MyProfile() {
   const profilePictureUrl = useAppStore((state) => state.profilePictureUrl);
   const gender = useAppStore((state) => state.gender);
   const address = useAppStore((state) => state.address);
+  const [viewerVisible, setViewerVisible] = useState(false);
   const options = [
     {
       icon: "person",
       label: "Edit Profile",
       onPress: () => pushOnce("/(drawer)/profile/editProfile"),
-    },
-    {
-      icon: "document-text",
-      label: "My Documents",
-      onPress: () => pushOnce("/(drawer)/profile/myDocument"),
     },
     {
       icon: "settings",
@@ -45,11 +42,13 @@ export default function MyProfile() {
         {/* Profile Image with Border */}
         <View className="relative p-2 border rounded-full border-lightPrimary">
           {profilePictureUrl ? (
-            <Image
-              source={{uri: profilePictureUrl}}
-              style={{width: 120, height: 120, borderRadius: 999}}
-              contentFit="cover"
-            />
+            <Pressable onPress={() => setViewerVisible(true)}>
+              <Image
+                source={{uri: profilePictureUrl}}
+                style={{width: 120, height: 120, borderRadius: 999}}
+                contentFit="cover"
+              />
+            </Pressable>
           ) : (
             <Ionicons name="person-circle" size={120} color="#F7931E" />
           )}
@@ -113,6 +112,15 @@ export default function MyProfile() {
           </Pressable>
         ))}
       </View>
+
+      {!!profilePictureUrl && (
+        <ImageViewer
+          images={[{uri: profilePictureUrl}]}
+          imageIndex={0}
+          visible={viewerVisible}
+          onRequestClose={() => setViewerVisible(false)}
+        />
+      )}
     </ScrollView>
   );
 }

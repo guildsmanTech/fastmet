@@ -27,15 +27,6 @@ export default function ProfileLayout() {
           ),
         }}
       />
-      <Stack.Screen
-        name="myDocument"
-        options={{
-          title: "My Documents",
-          headerTitle: ({ children }) => (
-            <HeaderProfile title={children} fallbackHref="/(drawer)/profile" />
-          ),
-        }}
-      />
     </Stack>
   );
 }

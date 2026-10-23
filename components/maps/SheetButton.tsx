@@ -1,4 +1,6 @@
+import { fetchAuthMeta } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
+import { ApprovalStatus } from "@/store/slices/authSlice";
 import { BOOKING_QUOTE_KEY } from "@/hooks/useBookingQuote";
 import { useAppStore } from "@/store/useAppStore";
 import {
@@ -25,6 +27,7 @@ const SheetButton = ({
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
   const { isLoggedIn } = useAuth();
 
   const quoteStatus = useAppStore((state) => state.quoteStatus);
@@ -39,7 +42,23 @@ const SheetButton = ({
   const registrationStep = useAppStore((state) => state.registrationStep);
   const approvalStatus = useAppStore((state) => state.approvalStatus);
 
-  const handleNext = () => {
+  const refreshApprovalStatus = async (): Promise<ApprovalStatus> => {
+    setCheckingStatus(true);
+    try {
+      const meta = await fetchAuthMeta();
+      useAppStore.getState().setAuthData({
+        registrationStep: meta.registrationStep,
+        approvalStatus: meta.approvalStatus,
+      });
+      return meta.approvalStatus;
+    } catch {
+      return approvalStatus;
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  const handleNext = async () => {
     if (!isLoggedIn) {
       setShowModal(true);
       return;
@@ -62,32 +81,35 @@ const SheetButton = ({
     if (!hasSubmittedId(registrationStep)) {
       Toast.show({
         type: "info",
-        text1: "ID verification required",
-        text2: "Submit your ID and selfie to continue.",
+        text1: "Face verification required",
+        text2: "Verify your face to continue.",
         position: "top",
         visibilityTime: 5_000,
         swipeable: true,
         topOffset: 50,
       });
-      router.push("/(auth)/id-verification" as Href);
+      router.push("/(auth)/face-verification" as Href);
       return;
     }
 
     if (approvalStatus === "rejected") {
-      Toast.show({
-        type: "error",
-        text1: "Verification rejected",
-        text2: "Please resubmit your documents.",
-        position: "top",
-        visibilityTime: 5_000,
-        swipeable: true,
-        topOffset: 50,
-      });
-      router.push("/(auth)/verification-resubmit" as Href);
+      router.push("/(auth)/verification-rejected" as Href);
       return;
     }
 
     if (!canBook(approvalStatus)) {
+      // The stored status only syncs on launch, so an admin decision made
+      // while the app was open would otherwise go unnoticed.
+      const latest = await refreshApprovalStatus();
+      if (latest === "approved") {
+        next();
+        return;
+      }
+      if (latest === "rejected") {
+        router.push("/(auth)/verification-rejected" as Href);
+        return;
+      }
+
       Toast.show({
         type: "info",
         text1: "Verification in progress",
@@ -162,11 +184,11 @@ const SheetButton = ({
       </View>
 
       <Pressable
-        disabled={isDisabled}
+        disabled={isDisabled || checkingStatus}
         className={`flex-1 py-3 rounded-md bg-lightPrimary active:bg-darkPrimary ${isDisabled ? "opacity-60" : ""}`}
         onPress={handleNext}
       >
-        {isPriceLoading ? (
+        {isPriceLoading || checkingStatus ? (
           <ActivityIndicator color="white" />
         ) : (
           <Text className="font-bold text-center text-lg text-white">

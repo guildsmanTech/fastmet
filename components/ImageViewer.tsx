@@ -39,7 +39,7 @@ function Header({
 
   return (
     <View
-      className="flex-row justify-between items-center px-4"
+      className="flex-row items-center justify-between px-4"
       style={{paddingTop: topPadding}}
     >
       {showCounter ? (

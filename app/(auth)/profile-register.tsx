@@ -124,7 +124,7 @@ export default function ProfileRegistration() {
           gender: user.gender,
         });
 
-        router.replace("/(auth)/id-verification" as Href);
+        router.replace("/(auth)/face-verification" as Href);
       }
     } catch (error) {
       console.error("Error registering profile:", error);
