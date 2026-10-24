@@ -1,69 +1,82 @@
 import { queryClient } from "@/lib/queryClient";
 import { useAppStore } from "@/store/useAppStore";
-import { Notification, NotificationsResponse } from "@/types/notification";
-import { NOTIFICATION_TYPES } from "@/utils/notification";
+import {
+  Notification,
+  NotificationsResponse,
+  UnreadCountResponse,
+} from "@/types/notification";
 import { InfiniteData } from "@tanstack/react-query";
 
-export const updateNotificationHelper = (
-  notification: Notification,
-  unreadNotifications: number,
-  type: NOTIFICATION_TYPES,
-) => {
+// An older notification that changed but isn't loaded stays on its own page
+// (the list is sorted by createdAt); only new ones go on top.
+const isNewest = (notification: Notification, top?: Notification) =>
+  !top ||
+  new Date(notification.createdAt).getTime() >=
+    new Date(top.createdAt).getTime();
+
+const setUnreadCount = (unreadNotifications: number) => {
   useAppStore.getState().setUnreadNotificationCount(unreadNotifications);
-
-  const notificationsQueries = queryClient.getQueriesData<
-    InfiniteData<NotificationsResponse>
-  >({ queryKey: ["notifications"] });
-
-  const hasNotificationsCache = notificationsQueries.some(
-    ([, data]) => !!data?.pages?.length,
-  );
-
-  if (hasNotificationsCache) {
-    queryClient.setQueriesData<InfiniteData<NotificationsResponse>>(
-      { queryKey: ["notifications"] },
-      (old) => {
-        if (!old?.pages?.length) return old;
-
-        // Check if notification for this booking already exists
-        let notificationExists = false;
-
-        const updatedPages = old.pages.map((page) => ({
-          ...page,
-          notifications: page.notifications.map((n) => {
-            // Update existing notification for the same booking
-            if (
-              n.type === type &&
-              n.data?.bookingId === notification.data?.bookingId
-            ) {
-              notificationExists = true;
-              // Replace with the updated notification from server
-              return {
-                ...notification,
-                isRead: false, // Ensure it's marked as unread
-              };
-            }
-            return n;
-          }),
-        }));
-
-        // If notification doesn't exist, add it to the first page
-        if (!notificationExists) {
-          updatedPages[0] = {
-            ...updatedPages[0],
-            notifications: [notification, ...updatedPages[0].notifications],
-          };
-        }
-
-        return {
-          ...old,
-          pages: updatedPages,
-        };
-      },
-    );
-  }
-
-  queryClient.setQueryData(["notificationUnreadCount"], {
+  queryClient.setQueryData<UnreadCountResponse>(["notificationUnreadCount"], {
     unreadCount: unreadNotifications,
   });
+};
+
+/**
+ * Puts a server notification into the list caches (replacing the same `_id`,
+ * e.g. an updated driver offer, else prepending a new one) and syncs the
+ * unread count.
+ */
+export const updateNotificationHelper = (
+  notification: Notification | null | undefined,
+  unreadNotifications?: number,
+) => {
+  if (typeof unreadNotifications === "number") {
+    setUnreadCount(unreadNotifications);
+  }
+  if (!notification?._id) return;
+
+  queryClient.setQueryData(["notification", notification._id], notification);
+  queryClient.setQueriesData<InfiniteData<NotificationsResponse>>(
+    { queryKey: ["notifications"] },
+    (old) => {
+      if (!old?.pages?.length) return old;
+
+      let found = false;
+      const pages = old.pages.map((page) => ({
+        ...page,
+        notifications: page.notifications.map((n) => {
+          if (n._id !== notification._id) return n;
+          found = true;
+          return notification;
+        }),
+      }));
+      if (!found && isNewest(notification, pages[0].notifications[0])) {
+        pages[0] = {
+          ...pages[0],
+          notifications: [notification, ...pages[0].notifications],
+        };
+      }
+      return { ...old, pages };
+    },
+  );
+};
+
+/**
+ * Re-reads the unread count after a reconnect or return to foreground
+ * (socket events may have been missed); refreshes the list only when the
+ * count changed.
+ */
+export const resyncNotifications = async () => {
+  const before = queryClient.getQueryData<UnreadCountResponse>([
+    "notificationUnreadCount",
+  ])?.unreadCount;
+
+  await queryClient.refetchQueries({ queryKey: ["notificationUnreadCount"] });
+
+  const after = queryClient.getQueryData<UnreadCountResponse>([
+    "notificationUnreadCount",
+  ])?.unreadCount;
+  if (after !== before) {
+    void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  }
 };

@@ -5,6 +5,7 @@ import {
 import { queryClient } from "@/lib/queryClient";
 import { useAppStore } from "@/store/useAppStore";
 import type {
+  Notification,
   NotificationsResponse,
   UnreadCountResponse,
 } from "@/types/notification";
@@ -51,6 +52,22 @@ export const useMarkNotificationAsRead = () => {
         if (wasUnread) break;
       }
 
+      // Opened from a push: the viewer's own cache knows the read state.
+      const previousNotification = queryClient.getQueryData<Notification>([
+        "notification",
+        notificationId,
+      ]);
+      if (!foundInCache && previousNotification) {
+        foundInCache = true;
+        wasUnread = !previousNotification.isRead;
+      }
+      if (previousNotification && !previousNotification.isRead) {
+        queryClient.setQueryData<Notification>(
+          ["notification", notificationId],
+          { ...previousNotification, isRead: true },
+        );
+      }
+
       // Optimistically mark the notification as read across *all* cached limits/pages
       queryClient.setQueriesData<InfiniteData<NotificationsResponse>>(
         { queryKey: ["notifications"] },
@@ -89,17 +106,24 @@ export const useMarkNotificationAsRead = () => {
 
       return {
         previousNotificationsQueries,
+        previousNotification,
         previousUnreadCount,
         prevStoreCount,
         wasUnread: shouldDecrement,
       };
     },
-    onError: (_err, _notificationId, context) => {
+    onError: (_err, notificationId, context) => {
       if (!context) return;
 
       // Rollback notifications
       for (const [key, data] of context.previousNotificationsQueries) {
         queryClient.setQueryData(key, data);
+      }
+      if (context.previousNotification) {
+        queryClient.setQueryData(
+          ["notification", notificationId],
+          context.previousNotification,
+        );
       }
 
       // Rollback unread count (both query cache + store)

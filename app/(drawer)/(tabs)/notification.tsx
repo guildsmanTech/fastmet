@@ -89,7 +89,7 @@ const NotificationScreen = () => {
               ) : (
                 <>
                   <Ionicons name="checkmark-done" size={18} color="#FFA840" />
-                  <Text className="text-sm font-medium text-primary">
+                  <Text className="text-sm font-medium text-darkPrimary">
                     Mark all as read
                   </Text>
                 </>
@@ -159,7 +159,7 @@ const NotificationCard = ({ item }: { item: Notification }) => {
         className="justify-center items-center rounded-full size-12"
         style={{ backgroundColor: `${config.color}20` }}
       >
-        <Ionicons name={config.icon as any} size={24} color={config.color} />
+        <Ionicons name={config.icon} size={24} color={config.color} />
       </View>
       <View className="flex-1 gap-1">
         <View className="flex-row justify-between items-center">

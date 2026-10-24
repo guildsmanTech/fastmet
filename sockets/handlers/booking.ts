@@ -20,8 +20,8 @@ export const acceptanceRequestedSchedule = (socket: Socket) => {
     unreadNotifications,
   }: {
     driverOffer: RequestedDriver;
-    notification: Notification;
-    unreadNotifications: number;
+    notification?: Notification | null;
+    unreadNotifications?: number;
   }) => {
     // Update ALL pending bookings to add the driver offer
     queryClient.setQueriesData(
@@ -50,14 +50,10 @@ export const acceptanceRequestedSchedule = (socket: Socket) => {
       },
     );
 
-    updateNotificationHelper(
-      notification,
-      unreadNotifications,
-      NOTIFICATION_TYPES.driver_offer,
-    );
+    updateNotificationHelper(notification, unreadNotifications);
 
     // Dynamic toast message based on driver count
-    const driverCount = notification.data?.drivers
+    const driverCount = notification?.data?.drivers
       ? Object.keys(notification.data.drivers).length
       : 1;
 
@@ -111,6 +107,7 @@ export const cancelScheduleDriverOffer = (socket: Socket) => {
         };
       },
     );
+    // The offer notification itself arrives updated on `notificationCreated`.
   };
 
   socket.on("offerCancelledSchedule", handleCancelScheduleDriverOffer);
@@ -127,8 +124,8 @@ export const driverUnavailable = (socket: Socket) => {
   }: {
     bookingId: string;
     driverId: string;
-    notification: Notification;
-    unreadNotifications: number;
+    notification?: Notification | null;
+    unreadNotifications?: number;
   }) => {
     console.log("🔔 Driver unavailable:", bookingId, driverId);
 
@@ -194,11 +191,7 @@ export const driverUnavailable = (socket: Socket) => {
       });
     }
 
-    updateNotificationHelper(
-      notification,
-      unreadNotifications,
-      NOTIFICATION_TYPES.driver_unavailable,
-    );
+    updateNotificationHelper(notification, unreadNotifications);
   };
 
   socket.on("driverUnavailable", handleDriverUnavailable);
@@ -230,13 +223,7 @@ export const rescheduleDriverResponse = (socket: Socket) => {
     });
     queryClient.invalidateQueries({queryKey: ["userBookingCounts"]});
 
-    if (notification?._id && typeof unreadNotifications === "number") {
-      updateNotificationHelper(
-        notification,
-        unreadNotifications,
-        NOTIFICATION_TYPES.driver_declined_reschedule,
-      );
-    }
+    updateNotificationHelper(notification, unreadNotifications);
 
     Toast.show({
       type: "info",
@@ -293,13 +280,7 @@ export const scheduledReminder = (socket: Socket) => {
     message: string;
     type: string;
   }) => {
-    if (notification?._id && typeof unreadNotifications === "number") {
-      updateNotificationHelper(
-        notification,
-        unreadNotifications,
-        (notification.type || type) as NOTIFICATION_TYPES,
-      );
-    }
+    updateNotificationHelper(notification, unreadNotifications);
 
     if (type === NOTIFICATION_TYPES.scheduled_auto_assigned) {
       queryClient.invalidateQueries({

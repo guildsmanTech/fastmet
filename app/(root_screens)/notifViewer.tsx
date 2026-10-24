@@ -1,8 +1,9 @@
-import { AdminBookingActionContent, BookingExpiredContent, DefaultContent, DriverOfferContent, ScheduledAutoAssignedContent, ScheduledAutoAssignWarningContent, ScheduledAutoCancelledContent, ScheduledChooseDriverContent, ScheduledNoDriversContent } from "@/components/NotifContentUI";
+import { NotificationContent } from "@/components/NotifContentUI";
 import { useMarkNotificationAsRead } from "@/mutations/notification";
 import { useNotificationById } from "@/queries/notification";
 import { formatDate } from "@/utils/helpers/date";
-import { getNotificationConfig, NOTIFICATION_TYPES } from "@/utils/notification";
+import { navigateToReportDetail } from "@/utils/helpers/notificationRouting";
+import { getNotificationConfig, NotificationAction } from "@/utils/notification";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect } from "react";
@@ -24,7 +25,7 @@ const NotifViewer = () => {
     }
   }, [markAsRead, notification, notificationId]);
 
-  if (isPending) {
+  if (isPending && notificationId) {
     return (
       <View className="flex-1 justify-center items-center bg-white">
         <ActivityIndicator size="large" color="#9CA3AF" />
@@ -32,15 +33,15 @@ const NotifViewer = () => {
     );
   }
 
-  if (error) {
+  if (error || !notification) {
     return (
-      <View className="flex-1 justify-center items-center bg-white">
+      <View className="flex-1 justify-center items-center px-8 bg-white">
         <Ionicons name="notifications-off-outline" size={64} color="#9CA3AF" />
-        <Text className="mt-4 text-lg text-gray-400">
+        <Text className="mt-4 text-lg text-center text-gray-400">
           {error ? error.message : "Notification not found"}
         </Text>
         <Pressable
-          className="px-6 py-3 mt-4 rounded-full bg-primary"
+          className="px-6 py-3 mt-4 rounded-full bg-darkPrimary active:opacity-80"
           onPress={() => router.back()}
         >
           <Text className="font-semibold text-white">Go Back</Text>
@@ -50,22 +51,46 @@ const NotifViewer = () => {
   }
 
   const config = getNotificationConfig(notification.type);
+  const reportId = notification.data?.reportId as string | undefined;
+
+  const runAction = (action: NotificationAction) => {
+    if ("opensReport" in action) {
+      if (reportId) navigateToReportDetail(reportId);
+      return;
+    }
+    router.dismissTo(action.href);
+  };
+  const action =
+    config.action && ("opensReport" in config.action ? !!reportId : true)
+      ? config.action
+      : undefined;
 
   return (
     <ScrollView
       className="flex-1 bg-white"
-      contentContainerStyle={{ paddingBottom: insets.bottom }}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
     >
       <View className="p-6">
         {/* Header */}
-        <View className="items-center mb-8">
+        <View className="items-center mb-6">
           <View
             className="justify-center items-center mb-4 rounded-full size-16"
             style={{ backgroundColor: `${config.color}20` }}
           >
-            <Ionicons name={config.icon as any} size={32} color={config.color} />
+            <Ionicons name={config.icon} size={32} color={config.color} />
           </View>
-          <Text className="text-2xl font-bold text-gray-900 text-center mb-2">
+          <View
+            className="px-3 py-1 mb-3 rounded-full"
+            style={{ backgroundColor: `${config.color}20` }}
+          >
+            <Text
+              className="text-xs font-semibold"
+              style={{ color: config.color }}
+            >
+              {config.label}
+            </Text>
+          </View>
+          <Text className="mb-2 text-2xl font-bold text-center text-gray-900">
             {notification.title}
           </Text>
           <Text className="text-sm text-gray-500">
@@ -74,53 +99,36 @@ const NotifViewer = () => {
         </View>
 
         {/* Message */}
-        <View className="mb-6 px-4">
-          <Text className="text-base leading-6 text-gray-600 text-center">
+        <View className="px-4 mb-6">
+          <Text className="text-base leading-6 text-center text-gray-600">
             {notification.message}
           </Text>
         </View>
 
         {/* Type-specific details */}
-        {renderNotificationContent(notification.type, notification.data)}
+        {notification.data && (
+          <NotificationContent
+            type={notification.type}
+            data={notification.data}
+            color={config.color}
+          />
+        )}
+
+        {action && (
+          <Pressable
+            className="flex-row gap-2 justify-center items-center py-4 mt-6 rounded-2xl active:opacity-80"
+            style={{ backgroundColor: config.color }}
+            onPress={() => runAction(action)}
+          >
+            <Text className="text-base font-semibold text-white">
+              {action.label}
+            </Text>
+            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+          </Pressable>
+        )}
       </View>
     </ScrollView>
   );
 };
 
 export default NotifViewer;
-
-// Type-specific content renderers
-// Add new notification types here
-const renderNotificationContent = (
-  type: NOTIFICATION_TYPES,
-  data: Record<string, any> | undefined
-) => {
-  if (!data) return null;
-
-  switch (type) {
-    case "driver_offer":
-      return <DriverOfferContent data={data} />;
-    case "booking_expired":
-      return <BookingExpiredContent data={data} />;
-    case "scheduled_choose_driver":
-      return <ScheduledChooseDriverContent data={data} />;
-    case "scheduled_no_drivers":
-      return <ScheduledNoDriversContent data={data} />;
-    case "scheduled_auto_assign_warning":
-      return <ScheduledAutoAssignWarningContent data={data} />;
-    case "scheduled_auto_assigned":
-      return <ScheduledAutoAssignedContent data={data} />;
-    case "scheduled_auto_cancelled":
-      return <ScheduledAutoCancelledContent data={data} />;
-    case "driver_started_scheduled_trip":
-      return <DefaultContent data={data} />;
-    case "booking_cancelled_admin":
-    case "booking_cancelled_driver_unavailable":
-    case "driver_account_restricted":
-    case "booking_force_completed_admin":
-    case "voucher_released_admin":
-      return <AdminBookingActionContent data={data} />;
-    default:
-      return <DefaultContent data={data} />;
-  }
-};

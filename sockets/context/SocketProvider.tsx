@@ -36,7 +36,9 @@ import {
 } from "../handlers/booking";
 import {forceLogout} from "../handlers/account";
 import {receiveMessage} from "../handlers/chat";
+import {notificationCreated} from "../handlers/notification";
 import {getSocket} from "../socket";
+import {resyncNotifications} from "@/utils/helpers/query";
 
 const SOCKET_RETRY_MIN_MS = 2000;
 const SOCKET_RETRY_MAX_MS = 30000;
@@ -68,9 +70,14 @@ export default function SocketProvider({
     socket.connect();
 
     const onAppState = (state: string) => {
-      if (state === "active" && !socket.connected) {
+      if (state !== "active") return;
+      if (!socket.connected) {
+        // Reconnecting resyncs notifications (see onConnect).
         socket.connect();
+        return;
       }
+      // Still connected: events may have been missed while backgrounded.
+      void resyncNotifications();
     };
     const appStateSub = AppState.addEventListener("change", onAppState);
 
@@ -89,8 +96,12 @@ export default function SocketProvider({
       retryDelay = Math.min(retryDelay * 2, SOCKET_RETRY_MAX_MS);
     };
 
+    // The first connect follows the initial fetch; later ones may have missed events.
+    let hasConnected = socket.connected;
     const onConnect = () => {
       retryDelay = SOCKET_RETRY_MIN_MS;
+      if (hasConnected) void resyncNotifications();
+      hasConnected = true;
     };
     socket.on("connect", onConnect);
 
@@ -153,6 +164,7 @@ export default function SocketProvider({
 
     const cleanupForceLogout = forceLogout(socket);
     const cleanupReceiveMessage = receiveMessage(socket);
+    const cleanupNotificationCreated = notificationCreated(socket);
     const cleanupAcceptanceRequestedSchedule =
       acceptanceRequestedSchedule(socket);
     const cleanupCancelScheduleDriverOffer = cancelScheduleDriverOffer(socket);
@@ -176,6 +188,7 @@ export default function SocketProvider({
       appStateSub.remove();
       cleanupForceLogout();
       cleanupReceiveMessage();
+      cleanupNotificationCreated();
       cleanupAcceptanceRequestedSchedule();
       cleanupCancelScheduleDriverOffer();
       cleanupDriverUnavailable();

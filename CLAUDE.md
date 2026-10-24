@@ -44,7 +44,7 @@ Imports use the `@/` alias for the repo root.
 
 **Realtime (`sockets/`)** — `socket.ts` keeps a singleton Socket.IO client recreated when the token changes. `context/SocketProvider.tsx` connects when logged in, reconnects on app foreground, refreshes the token on `"Authentication failed"`, and registers every handler. Each handler in `sockets/handlers/` is a function `(socket) => cleanup` that subscribes to one server event and patches React Query caches / store / shows toasts. **When adding a socket event, write a handler in this style and register + clean it up in `SocketProvider`.** Notification cache updates go through `updateNotificationHelper` in `utils/helpers/query.ts`.
 
-**Push notifications** — `hooks/usePushNotification.ts` + `utils/helpers/pushRegistration.ts`; tap routing in `utils/helpers/notificationRouting.ts`; notification type constants in `utils/notification.ts`.
+**Push notifications** — `hooks/usePushNotification.ts` + `utils/helpers/pushRegistration.ts`; tap routing in `utils/helpers/notificationRouting.ts` (stored notifications open `notifViewer` via `data.notificationId`). Every notification type has an entry (icon, color, label, action) in `utils/notification.ts` and a details layout in `NotificationContent` (`components/NotifContentUI.tsx`); `DefaultContent` is only the fallback for unknown types. The `notificationCreated` socket handler keeps the list and badge live for all types.
 
 **Styling** — NativeWind (Tailwind v3) `className` on RN components. Custom theme in `tailwind.config.js`: colors `lightPrimary` `#FFA840`, `darkPrimary` `#ED8718`, `secondary` `#0F2535`; fonts `font-montserrat` / `font-montserrat-bold`. Tailwind `content` only scans `app/` and `components/`.
 
