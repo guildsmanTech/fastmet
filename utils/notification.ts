@@ -17,6 +17,8 @@ export enum NOTIFICATION_TYPES {
   driver_confirmed_reschedule = "driver_confirmed_reschedule",
   driver_started_scheduled_trip = "driver_started_scheduled_trip",
   booking_cancelled_admin = "booking_cancelled_admin",
+  booking_cancelled_driver_unavailable = "booking_cancelled_driver_unavailable",
+  driver_account_restricted = "driver_account_restricted",
   booking_force_completed_admin = "booking_force_completed_admin",
   voucher_released_admin = "voucher_released_admin",
   report = "report",
@@ -86,6 +88,16 @@ export const NOTIFICATION_CONFIG: Record<
     icon: "close-circle",
     color: "#DC2626", // red
     label: "Booking Cancelled",
+  },
+  [NOTIFICATION_TYPES.booking_cancelled_driver_unavailable]: {
+    icon: "close-circle",
+    color: "#DC2626", // red
+    label: "Booking Cancelled",
+  },
+  [NOTIFICATION_TYPES.driver_account_restricted]: {
+    icon: "alert-circle",
+    color: "#F59E0B", // amber
+    label: "Delivery Update",
   },
   [NOTIFICATION_TYPES.booking_force_completed_admin]: {
     icon: "checkmark-circle",

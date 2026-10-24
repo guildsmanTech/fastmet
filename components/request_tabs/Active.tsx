@@ -75,7 +75,9 @@ export default function ActiveRoute() {
         text2:
           reason === "no_show_client"
             ? "Driver reported you as no-show"
-            : "Driver cancelled the booking",
+            : reason === "driver_unavailable"
+              ? "Your driver is no longer available. Please book again."
+              : "Driver cancelled the booking",
         position: "top",
         topOffset: 50,
         visibilityTime: 5000,

@@ -183,7 +183,9 @@ export const driverUnavailable = (socket: Socket) => {
       Toast.show({
         type: "info",
         text1: "Driver Unavailable",
+        // The server says why (delay, or the driver can no longer drive).
         text2:
+          notification?.message ||
           "Your driver was removed due to a delay that may impact your pickup time. Please confirm if you would like to reschedule the pickup or wait for a new driver assignment.",
         position: "top",
         visibilityTime: 4000,

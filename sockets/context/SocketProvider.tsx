@@ -1,5 +1,6 @@
 import {
   ACCOUNT_DEACTIVATED_ROUTE,
+  accountBannedRoute,
   accountSuspendedRoute,
   DEVICE_BANNED_ROUTE,
 } from "@/constants/routes";
@@ -33,6 +34,7 @@ import {
   scheduledReminder,
   tipUpdated,
 } from "../handlers/booking";
+import {forceLogout} from "../handlers/account";
 import {receiveMessage} from "../handlers/chat";
 import {getSocket} from "../socket";
 
@@ -105,6 +107,13 @@ export default function SocketProvider({
         case "Session displaced":
           void signOutDisplacedSession();
           return;
+        case "Account banned":
+          void performLogout(
+            accountBannedRoute(
+              (err as Error & {data?: {banReason?: unknown}}).data,
+            ),
+          );
+          return;
         case "Device banned":
           void performLogout(DEVICE_BANNED_ROUTE);
           return;
@@ -142,6 +151,7 @@ export default function SocketProvider({
       }
     });
 
+    const cleanupForceLogout = forceLogout(socket);
     const cleanupReceiveMessage = receiveMessage(socket);
     const cleanupAcceptanceRequestedSchedule =
       acceptanceRequestedSchedule(socket);
@@ -164,6 +174,7 @@ export default function SocketProvider({
       socket.off("connect", onConnect);
       socket.off("connect_error"); // Clean up the listener
       appStateSub.remove();
+      cleanupForceLogout();
       cleanupReceiveMessage();
       cleanupAcceptanceRequestedSchedule();
       cleanupCancelScheduleDriverOffer();

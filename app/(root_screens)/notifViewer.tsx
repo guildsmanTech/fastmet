@@ -115,6 +115,8 @@ const renderNotificationContent = (
     case "driver_started_scheduled_trip":
       return <DefaultContent data={data} />;
     case "booking_cancelled_admin":
+    case "booking_cancelled_driver_unavailable":
+    case "driver_account_restricted":
     case "booking_force_completed_admin":
     case "voucher_released_admin":
       return <AdminBookingActionContent data={data} />;

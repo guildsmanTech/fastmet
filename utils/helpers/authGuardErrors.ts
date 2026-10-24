@@ -1,5 +1,6 @@
 import {
   ACCOUNT_DEACTIVATED_ROUTE,
+  accountBannedRoute,
   DEVICE_BANNED_ROUTE,
 } from "@/constants/routes";
 import {router} from "expo-router";
@@ -18,6 +19,12 @@ export function routeAuthGuardError(
   const data = error.response?.data;
 
   if (status !== 403) return false;
+
+  // Account ban outranks every other restriction (same order as the server).
+  if (data?.accountBanned) {
+    router.replace(accountBannedRoute(data));
+    return true;
+  }
 
   if (data?.deviceBanned) {
     router.replace(DEVICE_BANNED_ROUTE);

@@ -4,6 +4,15 @@ export const DEVICE_BANNED_ROUTE = "/(auth)/device-banned" as Href;
 export const DEVICE_BLOCKED_ROUTE = "/(auth)/device-blocked" as Href;
 export const ACCOUNT_DEACTIVATED_ROUTE = "/(auth)/account-deactivated" as Href;
 
+/** Banned screen. `data` is a 403 `accountBanned` body (fields optional). */
+export const accountBannedRoute = (data?: { banReason?: unknown }): Href =>
+  ({
+    pathname: "/(auth)/account-banned",
+    params: {
+      banReason: typeof data?.banReason === "string" ? data.banReason : "",
+    },
+  }) as Href;
+
 /** Suspended screen. `data` is a 403 `accountSuspended` body (fields optional). */
 export const accountSuspendedRoute = (data?: {
   suspendedUntil?: unknown;

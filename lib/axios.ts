@@ -1,5 +1,6 @@
 import {
   ACCOUNT_DEACTIVATED_ROUTE,
+  accountBannedRoute,
   accountSuspendedRoute,
   DEVICE_BANNED_ROUTE,
 } from "@/constants/routes";
@@ -51,6 +52,13 @@ const SESSION_EXPIRED_NOTICE: LogoutNotice = {
 const SESSION_DISPLACED_NOTICE: LogoutNotice = {
   title: "Signed Out",
   message: "Your account was signed in on another device.",
+  visibilityTime: 6000,
+};
+
+// An admin approved another account's unlink request for this device.
+const DEVICE_UNLINKED_NOTICE: LogoutNotice = {
+  title: "Signed Out",
+  message: "This device is now linked to another account.",
   visibilityTime: 6000,
 };
 
@@ -116,6 +124,9 @@ export const expireSession = () =>
 export const signOutDisplacedSession = () =>
   performLogout(undefined, SESSION_DISPLACED_NOTICE);
 
+export const signOutUnlinkedDevice = () =>
+  performLogout(undefined, DEVICE_UNLINKED_NOTICE);
+
 export const endSession = (reason: SessionExpiredError) =>
   reason.displaced ? signOutDisplacedSession() : expireSession();
 
@@ -157,6 +168,11 @@ export const ensureFreshToken = (): Promise<string> => {
       if (!isAxiosError(error) || !error.response) throw error;
 
       const {status, data} = error.response;
+
+      if (status === 403 && data?.accountBanned) {
+        await performLogout(accountBannedRoute(data));
+        return never<string>();
+      }
 
       if (status === 403 && data?.accountDeactivated) {
         await performLogout(ACCOUNT_DEACTIVATED_ROUTE);
@@ -214,6 +230,12 @@ api.interceptors.response.use(
         deferred: false,
       });
       return Promise.reject(error);
+    }
+
+    // Account ban outranks a device ban (the server sends it first too).
+    if (status === 403 && data?.accountBanned) {
+      await performLogout(accountBannedRoute(data));
+      return never();
     }
 
     if (status === 403 && data?.deviceBanned) {
