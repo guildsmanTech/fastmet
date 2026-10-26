@@ -1,5 +1,9 @@
 import api from "@/lib/axios";
-import { ConversationResponse, MessageResponse } from "@/types/chat";
+import {
+  ChatMessage,
+  ConversationResponse,
+  MessageResponse,
+} from "@/types/chat";
 
 export const fetchConversations = async (
   page = 1,
@@ -40,4 +44,26 @@ export const fetchUnreadChatCount = async () => {
     "/message/unread-count",
   );
   return res.data;
+};
+
+/** Sends an image message. The same clientMessageId on retry never duplicates. */
+export const uploadChatImage = async (
+  conversationId: string,
+  uri: string,
+  clientMessageId: string,
+): Promise<ChatMessage> => {
+  const form = new FormData();
+  form.append("clientMessageId", clientMessageId);
+  form.append("image", {
+    uri,
+    type: "image/jpeg",
+    name: `${clientMessageId}.jpg`,
+  } as unknown as Blob);
+
+  const { data } = await api.post<{ success: boolean; message: ChatMessage }>(
+    `/message/conversation/${conversationId}/image`,
+    form,
+    { headers: { "Content-Type": "multipart/form-data" }, timeout: 60_000 },
+  );
+  return data.message;
 };

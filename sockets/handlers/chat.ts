@@ -11,19 +11,15 @@ export const receiveMessage = (socket: Socket) => {
     message: string;
     sender: string;
     conversationId: string;
-    profilePictureUrl: string;
+    profilePictureUrl: string | null;
   }) => {
-    console.log("📩 New message badge received:", data);
     useAppStore
       .getState()
       .setUnreadConversationsCount(data.unreadConversationsCount);
 
-    const {isInMessageScreen, activeConversationId} = useAppStore.getState();
-    const isViewingThisConversation =
-      isInMessageScreen && activeConversationId === data.conversationId;
-
-    // Skip optimistic update if the client is actively reading this conversation
-    if (!isViewingThisConversation) {
+    // The server skips the badge while this chat is open; this guards races.
+    const {activeChat} = useAppStore.getState();
+    if (activeChat?.conversationId !== data.conversationId) {
       type ConversationsPage = {
         conversations: ConversationResponse[];
         nextPage: number | null;

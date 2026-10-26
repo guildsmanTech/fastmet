@@ -14,6 +14,7 @@ import { createConversationId } from "@/utils/helpers/booking";
 import { describeDriverQueue } from "@/utils/helpers/driverWorkload";
 import { formatLocation } from "@/utils/helpers/location";
 import { pushOnce } from "@/utils/helpers/navigation";
+import { openChat as openChatScreen } from "@/utils/helpers/openChat";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
@@ -252,10 +253,7 @@ const ActiveCard = ({
   const openChat = () => {
     if (!conversationId) return;
     clearConversationUnreadInCache(conversationId);
-    pushOnce({
-      pathname: "/message",
-      params: { conversationId },
-    });
+    openChatScreen(conversationId);
   };
 
   const isPooling = bookingType.type === "pooling";

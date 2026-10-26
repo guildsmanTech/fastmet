@@ -11,6 +11,7 @@ import {
 import { useSocket } from "@/sockets/context/SocketProvider";
 import { useAppStore } from "@/store/useAppStore";
 import { createConversationId } from "@/utils/helpers/booking";
+import { openChat as openChatScreen } from "@/utils/helpers/openChat";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -72,10 +73,7 @@ export default function ViewOnMap() {
   const openChat = useCallback(() => {
     clearActiveChatUnread();
     if (!activeConversationId) return;
-    router.push({
-      pathname: "/message",
-      params: { conversationId: activeConversationId },
-    });
+    openChatScreen(activeConversationId);
   }, [activeConversationId, clearActiveChatUnread]);
 
   useEffect(() => {
@@ -102,9 +100,9 @@ export default function ViewOnMap() {
       conversationId: string;
     }) => {
       if (conversationId !== activeConversationId) return;
-      const { isInMessageScreen, activeConversationId: viewingId } =
-        useAppStore.getState();
-      if (isInMessageScreen && viewingId === conversationId) return;
+      if (useAppStore.getState().activeChat?.conversationId === conversationId) {
+        return;
+      }
       setChatUnreadCount((n) => n + 1);
     };
 

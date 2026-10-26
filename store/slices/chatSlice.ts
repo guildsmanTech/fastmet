@@ -1,25 +1,23 @@
+import { ChatSurface } from "@/types/chat";
 import { StateCreator } from "zustand";
+
+export type ActiveChat = { conversationId: string; surface: ChatSurface };
 
 export interface ChatSlice {
   unreadConversationsCount: number;
   setUnreadConversationsCount: (count: number) => void;
-  isInMessageScreen: boolean;
-  setIsInMessageScreen: (inMessageScreen: boolean) => void;
-  activeConversationId: string | null;
-  setActiveConversationId: (id: string | null) => void;
+  /** The chat currently open on screen, if any (set by useChatRoom). */
+  activeChat: ActiveChat | null;
+  setActiveChat: (chat: ActiveChat | null) => void;
 }
 
 export const createChatSlice: StateCreator<ChatSlice> = (set) => ({
-  isInMessageScreen: false,
   unreadConversationsCount: 0,
-  activeConversationId: null,
+  activeChat: null,
   setUnreadConversationsCount: (count: number) => {
     set({ unreadConversationsCount: count });
   },
-  setIsInMessageScreen: (inMessageScreen: boolean) => {
-    set({ isInMessageScreen: inMessageScreen });
-  },
-  setActiveConversationId: (id: string | null) => {
-    set({ activeConversationId: id });
+  setActiveChat: (chat: ActiveChat | null) => {
+    set({ activeChat: chat });
   },
 });

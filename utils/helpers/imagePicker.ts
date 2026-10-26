@@ -15,7 +15,10 @@ export const openGallery = async () => {
   });
 };
 
-export const takePhoto = async (): Promise<string | null> => {
+export type PickedImage = { uri: string; width: number; height: number };
+
+/** Camera with the permission flow; null when denied or cancelled. */
+export const takePhotoAsset = async (): Promise<PickedImage | null> => {
   // Check current status first
   const { status: currentStatus } =
     await ImagePicker.getCameraPermissionsAsync();
@@ -52,30 +55,50 @@ export const takePhoto = async (): Promise<string | null> => {
     return null;
   }
 
-  return result.assets[0].uri;
+  const { uri, width, height } = result.assets[0];
+  return { uri, width, height };
 };
 
-export const convertImageToBase64 = async (uri: string): Promise<string> => {
-  // First, convert and compress the image (handles HEIC -> JPEG conversion)
-  const manipResult = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: 1200 } }], // Resize to max 1200px width (keeps aspect ratio)
-    {
-      compress: 0.7,
-      format: ImageManipulator.SaveFormat.JPEG, // Force JPEG format
-      base64: true,
-    }
-  );
+export const takePhoto = async (): Promise<string | null> =>
+  (await takePhotoAsset())?.uri ?? null;
 
-  const response = await fetch(manipResult.uri);
-  const blob = await response.blob();
+/** One image for a chat message, from the camera or the photo library. */
+export const pickChatImage = async (
+  source: "camera" | "gallery"
+): Promise<PickedImage | null> => {
+  if (source === "camera") return takePhotoAsset();
 
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
+  const result = await openGallery();
+  if (result.canceled || !result.assets?.[0]) return null;
+  const { uri, width, height } = result.assets[0];
+  return { uri, width, height };
+};
+
+const CHAT_IMAGE_MAX_SIDE = 1600;
+
+/**
+ * JPEG file for a chat upload: longest side capped (never enlarged), so tall
+ * screenshots stay small too. Also converts HEIC.
+ */
+export const prepareChatImage = async ({
+  uri,
+  width,
+  height,
+}: PickedImage): Promise<string> => {
+  const context = ImageManipulator.ImageManipulator.manipulate(uri);
+  if (Math.max(width, height) > CHAT_IMAGE_MAX_SIDE) {
+    context.resize(
+      width >= height
+        ? { width: CHAT_IMAGE_MAX_SIDE }
+        : { height: CHAT_IMAGE_MAX_SIDE }
+    );
+  }
+  const imageRef = await context.renderAsync();
+  const result = await imageRef.saveAsync({
+    compress: 0.7,
+    format: ImageManipulator.SaveFormat.JPEG,
   });
+  return result.uri;
 };
 
 export const uploadBookingImages = async (

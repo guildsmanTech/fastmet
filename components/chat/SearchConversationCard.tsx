@@ -1,17 +1,12 @@
 import { ConversationResponse } from "@/types/chat";
-import { pushOnce } from "@/utils/helpers/navigation";
+import { openChat } from "@/utils/helpers/openChat";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Pressable, Text, View } from "react-native";
 
 const SearchConversationCard = ({ item }: { item: ConversationResponse }) => {
     return (
-        <Pressable className="flex-row items-center gap-4 px-4 py-2 active:bg-ctaSecondary" onPress={() =>
-            pushOnce({
-                pathname: "/message",
-                params: { conversationId: item._id },
-            })
-        }>
+        <Pressable className="flex-row items-center gap-4 px-4 py-2 active:bg-ctaSecondary" onPress={() => openChat(item._id)}>
             {item.driver.profilePictureUrl ? (
                 <Image
                     source={{ uri: item.driver.profilePictureUrl }}

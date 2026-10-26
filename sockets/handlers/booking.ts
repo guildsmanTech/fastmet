@@ -523,10 +523,10 @@ export const bookingQueueUpdated = (socket: Socket) => {
     );
 
     // An open chat lists the bookings shared with this driver; refresh it.
-    const {isInMessageScreen, activeConversationId} = useAppStore.getState();
-    if (isInMessageScreen && activeConversationId) {
+    const {activeChat} = useAppStore.getState();
+    if (activeChat) {
       void queryClient.invalidateQueries({
-        queryKey: ["conversation", activeConversationId],
+        queryKey: ["conversation", activeChat.conversationId],
       });
     }
   };

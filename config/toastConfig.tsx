@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
+import { openChat } from "@/utils/helpers/openChat";
 
 export const toastConfig = {
   bookingAccepted: ({ text1, text2 }: any) => (
@@ -48,12 +49,7 @@ export const toastConfig = {
     <Pressable
       onPress={() => {
         Toast.hide();
-        router.push({
-          pathname: "/message",
-          params: {
-            conversationId: props.conversationId,
-          },
-        });
+        openChat(props.conversationId);
       }}
       className="mx-4 mb-2 rounded-2xl bg-white px-4 py-3 flex-row items-center shadow-md active:opacity-80"
     >

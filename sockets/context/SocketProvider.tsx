@@ -69,13 +69,21 @@ export default function SocketProvider({
 
     socket.connect();
 
+    // The server pushes chat messages only when no app is in the foreground.
+    // iOS "inactive" is a brief transition, so only background/active count.
     const onAppState = (state: string) => {
+      if (state === "background") {
+        if (socket.connected) socket.emit("app_state", {active: false});
+        return;
+      }
       if (state !== "active") return;
       if (!socket.connected) {
-        // Reconnecting resyncs notifications (see onConnect).
+        // Reconnecting resyncs notifications (see onConnect); the handshake
+        // carries the foreground state.
         socket.connect();
         return;
       }
+      socket.emit("app_state", {active: true});
       // Still connected: events may have been missed while backgrounded.
       void resyncNotifications();
     };

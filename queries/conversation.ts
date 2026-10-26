@@ -7,7 +7,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient } from "@/lib/queryClient";
 import { useAppStore } from "@/store/useAppStore";
-import { ConversationResponse } from "@/types/chat";
+import { ChatMessage, ConversationResponse } from "@/types/chat";
 import { InfiniteData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 type ConversationsPage = {
@@ -47,6 +47,38 @@ export const clearConversationUnreadInCache = (
               ? { ...c, unreadCount: { ...c.unreadCount, client: 0 } }
               : c,
           ),
+        })),
+      };
+    },
+  );
+};
+
+/** After leaving a chat: unread 0 and the latest message as the preview. */
+export const applyChatExitToCache = (
+  conversationId: string,
+  latest: ChatMessage | undefined,
+): void => {
+  queryClient.setQueriesData<InfiniteData<ConversationsPage>>(
+    { queryKey: ["conversations"] },
+    (old) => {
+      if (!old?.pages?.length) return old;
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          conversations: page.conversations.map((c) => {
+            if (c._id !== conversationId) return c;
+            const updated = {
+              ...c,
+              unreadCount: { ...c.unreadCount, client: 0 },
+            };
+            if (latest) {
+              updated.lastMessage = latest.text || "Sent an image";
+              updated.lastMessageAt = latest.createdAt;
+              updated.lastMessageBy = latest.senderType;
+            }
+            return updated;
+          }),
         })),
       };
     },

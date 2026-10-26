@@ -1,3 +1,4 @@
+import { AppState } from "react-native";
 import { io, Socket } from "socket.io-client";
 import { socketVersionAuth } from "@/utils/appVersion";
 
@@ -23,7 +24,13 @@ export const getSocket = (token: string) => {
     // Create new socket
     socket = io(SOCKET_URL, {
       autoConnect: false,
-      auth: { token, ...socketVersionAuth() },
+      // A function so every (re)connect sends the current foreground state.
+      auth: (cb) =>
+        cb({
+          token,
+          ...socketVersionAuth(),
+          appActive: AppState.currentState !== "background",
+        }),
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,

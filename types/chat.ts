@@ -5,7 +5,6 @@ export type ConversationResponse = {
   lastMessageAt: string;
   hasActiveBooking?: boolean;
 
-  participantId: string;
   unreadCount: {
     client: number;
     driver: number;
@@ -15,7 +14,6 @@ export type ConversationResponse = {
     firstName: string;
     lastName: string;
     profilePictureUrl?: string;
-    phoneNumber: string;
   };
 };
 
@@ -29,13 +27,23 @@ export type MessageResponse = {
     firstName: string;
     lastName: string;
     profilePictureUrl?: string;
-    phoneNumber: string;
+    /** Only sent while the chat is open (active booking). */
+    phoneNumber?: string;
     gender?: "male" | "female";
   };
 };
 
-export interface MessagesLoadedData {
-  messages: any[];
-  skip: number;
-  hasMore: boolean;
-}
+/** A message as the server sends it (socket acks, `receive_message`, image upload). */
+export type ChatMessage = {
+  _id: string;
+  conversationId: string;
+  senderId: string;
+  senderType: "client" | "driver";
+  text: string;
+  image: string | null;
+  createdAt: string;
+  clientMessageId: string | null;
+};
+
+/** Where a chat is open: the full message screen or a modal over another screen. */
+export type ChatSurface = "screen" | "modal";

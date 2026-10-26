@@ -49,7 +49,10 @@ const Chats = () => {
       </View>
     );
 
-  const conversations = data?.pages.flatMap((page) => page.conversations) ?? [];
+  // Pages are offset-based, so a chat that moved up can appear twice.
+  const seen = new Set<string>();
+  const conversations = (data?.pages.flatMap((page) => page.conversations) ?? [])
+    .filter((c) => !seen.has(c._id) && !!seen.add(c._id));
 
   const handleSearchPress = () => {
     pushOnce("/searchChat");

@@ -1,6 +1,7 @@
 import {queryClient} from "@/lib/queryClient";
 import {PENDING_REPORTS_AGAINST_ME_KEY} from "@/queries/reportQueries";
 import {pushOnce} from "@/utils/helpers/navigation";
+import {openChat} from "@/utils/helpers/openChat";
 import {router} from "expo-router";
 
 type NotificationData = Record<string, unknown> | undefined | null;
@@ -81,10 +82,7 @@ export function handleNotificationEntry(
     if (conversationId) {
       setTimeout(() => {
         try {
-          pushOnce({
-            pathname: "/message",
-            params: {conversationId},
-          });
+          openChat(conversationId);
         } catch {
           // navigation not ready — ignore
         }
