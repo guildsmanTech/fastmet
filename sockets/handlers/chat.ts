@@ -1,4 +1,5 @@
 import {queryClient} from "@/lib/queryClient";
+import {markConversationSeenInCache} from "@/queries/conversation";
 import {useAppStore} from "@/store/useAppStore";
 import {ConversationResponse} from "@/types/chat";
 import {InfiniteData} from "@tanstack/react-query";
@@ -112,8 +113,13 @@ export const receiveMessage = (socket: Socket) => {
       .setUnreadConversationsCount(data.unreadConversationsCount);
   };
 
+  const conversationSeenHandler = (data: {conversationId: string}) => {
+    markConversationSeenInCache(data.conversationId);
+  };
+
   socket.on("new_message_badge", receiveMessageHandler);
   socket.on("unread_conversations_updated", unreadConversationsUpdatedHandler);
+  socket.on("conversation_seen", conversationSeenHandler);
 
   return () => {
     socket.off("new_message_badge", receiveMessageHandler);
@@ -121,5 +127,6 @@ export const receiveMessage = (socket: Socket) => {
       "unread_conversations_updated",
       unreadConversationsUpdatedHandler,
     );
+    socket.off("conversation_seen", conversationSeenHandler);
   };
 };

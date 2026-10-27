@@ -53,11 +53,33 @@ export const clearConversationUnreadInCache = (
   );
 };
 
+/** The driver read this chat, so our last message shows as seen. */
+export const markConversationSeenInCache = (conversationId: string): void => {
+  queryClient.setQueriesData<InfiniteData<ConversationsPage>>(
+    { queryKey: ["conversations"] },
+    (old) => {
+      if (!old?.pages?.length) return old;
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          conversations: page.conversations.map((c) =>
+            c._id === conversationId
+              ? { ...c, unreadCount: { ...c.unreadCount, driver: 0 } }
+              : c,
+          ),
+        })),
+      };
+    },
+  );
+};
+
 /** After leaving a chat: unread 0 and the latest message as the preview. */
 export const applyChatExitToCache = (
   conversationId: string,
   latest: ChatMessage | undefined,
 ): void => {
+  let sentNew = false;
   queryClient.setQueriesData<InfiniteData<ConversationsPage>>(
     { queryKey: ["conversations"] },
     (old) => {
@@ -73,6 +95,14 @@ export const applyChatExitToCache = (
               unreadCount: { ...c.unreadCount, client: 0 },
             };
             if (latest) {
+              // We sent it on this visit: not seen until the server says so.
+              if (
+                latest.senderType === "client" &&
+                latest.createdAt !== c.lastMessageAt
+              ) {
+                sentNew = true;
+                updated.unreadCount.driver = Math.max(c.unreadCount.driver, 1);
+              }
               updated.lastMessage = latest.text || "Sent an image";
               updated.lastMessageAt = latest.createdAt;
               updated.lastMessageBy = latest.senderType;
@@ -83,6 +113,8 @@ export const applyChatExitToCache = (
       };
     },
   );
+  // The driver may have read it while we were in the chat.
+  if (sentNew) void queryClient.invalidateQueries({ queryKey: ["conversations"] });
 };
 
 export const useConversations = (limit: number) => {

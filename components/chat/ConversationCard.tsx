@@ -51,7 +51,7 @@ const ConversationCard = ({item}: {item: ConversationResponse}) => {
             </View>
           ) : item.unreadCount.driver === 0 &&
             item.lastMessageBy === "client" ? (
-            <Text className="text-xs font-bold text-white">seen</Text>
+            <Text className="text-xs font-bold text-gray-400">seen</Text>
           ) : null}
         </View>
       </View>
