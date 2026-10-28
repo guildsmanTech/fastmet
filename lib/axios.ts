@@ -108,6 +108,7 @@ export const performLogout = (
 
     disconnectSocket();
     await clearPushRegistrationCache().catch(() => {});
+    useAppStore.getState().clearStates();
     useAppStore.getState().logout();
     queryClient.clear();
     router.replace(redirectTo);

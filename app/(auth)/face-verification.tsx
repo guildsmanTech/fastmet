@@ -2,6 +2,7 @@ import {
   completeFaceVerification,
   startFaceVerification,
 } from "@/api/faceVerification";
+import {fetchAuthMeta} from "@/api/auth";
 import {useAuthGuard} from "@/hooks/useAuthGuard";
 import {useAppStore} from "@/store/useAppStore";
 import {Ionicons} from "@expo/vector-icons";
@@ -23,14 +24,14 @@ import {WebView, WebViewMessageEvent} from "react-native-webview";
 // Hosted by fastmet_web (/app-view/face-verification). The page runs the AWS
 // Face Liveness check and posts {type: "complete" | "cancel" | "error"} back.
 const LIVENESS_ORIGIN =
-  process.env.PRE_REG_WEB_URL || "https://www.fastmet.com.ph";
+  process.env.EXPO_PUBLIC_OFFICIAL_WEB_URL || "https://www.fastmet.com.ph";
 const LIVENESS_PATH = "/app-view/face-verification";
 
 type Phase =
   | {name: "intro"}
   | {name: "scanning"; sessionId: string}
   | {name: "processing"}
-  | {name: "review"}
+  | {name: "review"; attemptsExhausted?: boolean}
   | {
       name: "error";
       code: string;
@@ -136,6 +137,28 @@ export default function FaceVerification() {
   const [phase, setPhase] = useState<Phase>({name: "intro"});
   const [starting, setStarting] = useState(false);
 
+  // The server says this account is past face verification (passed, or
+  // flagged and waiting for review): pull its real state and move on rather
+  // than offering a scan that can't succeed.
+  const leaveIfAlreadyVerified = async (error: any): Promise<boolean> => {
+    if (error?.response?.data?.code !== "ALREADY_VERIFIED") return false;
+    try {
+      const meta = await fetchAuthMeta();
+      useAppStore.getState().setAuthData({
+        registrationStep: meta.registrationStep,
+        approvalStatus: meta.approvalStatus,
+      });
+      if (meta.approvalStatus === "approved") {
+        router.replace("/(drawer)/book");
+        return true;
+      }
+    } catch {
+      // Fall through to the review screen; the next launch re-syncs.
+    }
+    setPhase({name: "review"});
+    return true;
+  };
+
   const onStart = async () => {
     if (!isAuthenticated()) return;
 
@@ -155,6 +178,7 @@ export default function FaceVerification() {
       const sessionId = await startFaceVerification();
       setPhase({name: "scanning", sessionId});
     } catch (error) {
+      if (await leaveIfAlreadyVerified(error)) return;
       setPhase({
         name: "error",
         code: "START_ERROR",
@@ -201,8 +225,9 @@ export default function FaceVerification() {
         return;
       }
 
-      setPhase({name: "review"});
+      setPhase({name: "review", attemptsExhausted: data.attemptsExhausted});
     } catch (error) {
+      if (await leaveIfAlreadyVerified(error)) return;
       setPhase({
         name: "error",
         code: "COMPLETE_ERROR",
@@ -211,9 +236,10 @@ export default function FaceVerification() {
     }
   };
 
+  // No URL check here: nativeEvent.url isn't reliable across platforms, and
+  // onShouldStartLoadWithRequest already keeps the webview on the liveness
+  // page, so every message comes from it.
   const onMessage = (event: WebViewMessageEvent, sessionId: string) => {
-    if (!isFromLivenessPage(event.nativeEvent.url)) return;
-
     let message: LivenessMessage;
     try {
       message = JSON.parse(event.nativeEvent.data);
@@ -338,18 +364,31 @@ export default function FaceVerification() {
           style={{flex: 1}}
           onMessage={(event) => onMessage(event, phase.sessionId)}
           // iOS also asks for sub-frame and about:blank loads; those can't
-          // move the user to another page, so let them through.
-          onShouldStartLoadWithRequest={(request) =>
-            request.isTopFrame === false ||
-            request.url === "about:blank" ||
-            isFromLivenessPage(request.url)
-          }
+          // move the user to another page, so let them through. Any other
+          // page (e.g. a redirect to a login wall) ends the scan here.
+          onShouldStartLoadWithRequest={(request) => {
+            if (
+              request.isTopFrame === false ||
+              request.url === "about:blank" ||
+              isFromLivenessPage(request.url)
+            ) {
+              return true;
+            }
+            setPhase({
+              name: "error",
+              code: "LOAD_ERROR",
+              message: "Couldn't open the face scan. Please try again later.",
+            });
+            return false;
+          }}
           // Client-side route changes (history.pushState) skip the check
           // above, so leave the webview if the page ever navigates away.
           onNavigationStateChange={(navState) => {
             if (!isFromLivenessPage(navState.url)) setPhase({name: "intro"});
           }}
-          originWhitelist={[LIVENESS_ORIGIN]}
+          // URLs outside originWhitelist are handed to the OS browser, so
+          // accept all here and let onShouldStartLoadWithRequest block them.
+          originWhitelist={["*"]}
           setSupportMultipleWindows={false}
           mediaPlaybackRequiresUserAction={false}
           allowsInlineMediaPlayback
@@ -406,11 +445,12 @@ export default function FaceVerification() {
             </View>
           </View>
           <Text className="mb-2 text-2xl font-extrabold text-center text-gray-900">
-            Almost there
+            {phase.attemptsExhausted ? "We'll take it from here" : "Almost there"}
           </Text>
           <Text className="text-sm leading-6 text-center text-gray-500">
-            Thanks for verifying. We need a little more time to review your
-            account.
+            {phase.attemptsExhausted
+              ? "We couldn't verify your face automatically, so our team will review your account instead. You don't need to scan again."
+              : "Thanks for verifying. We need a little more time to review your account."}
           </Text>
 
           <View className="w-full gap-3 p-4 mt-8 bg-gray-50 rounded-2xl">

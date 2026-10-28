@@ -13,6 +13,7 @@ import {
 import { openGallery } from "@/utils/helpers/imagePicker";
 import { validateForm } from "@/utils/helpers/validateForm";
 import { Ionicons } from "@expo/vector-icons";
+import { isAxiosError } from "axios";
 import { Image } from "expo-image";
 import { router, type Href } from "expo-router";
 import React, { useCallback, useState } from "react";
@@ -128,7 +129,21 @@ export default function ProfileRegistration() {
       }
     } catch (error) {
       console.error("Error registering profile:", error);
-      Alert.alert("Error", "Failed to register profile. Please try again.");
+      if (isAxiosError(error) && error.response?.status === 409) {
+        setErrors({
+          email:
+            error.response.data?.message ??
+            "This email is already in use. Please use a different email.",
+        });
+        return;
+      }
+      const message = isAxiosError(error)
+        ? error.response?.data?.message || error.response?.data?.error
+        : undefined;
+      Alert.alert(
+        "Error",
+        message || "Failed to register profile. Please try again.",
+      );
     } finally {
       setLoading(false);
     }

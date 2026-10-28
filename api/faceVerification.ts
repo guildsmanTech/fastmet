@@ -4,7 +4,15 @@ import {ApprovalStatus} from "@/store/slices/authSlice";
 export type FaceVerificationResult =
   | {
       success: true;
-      result: "approved" | "flagged";
+      result: "approved";
+      registrationStep: number;
+      approvalStatus: ApprovalStatus;
+    }
+  | {
+      success: true;
+      result: "flagged";
+      // True when every scan attempt failed; picks the review message.
+      attemptsExhausted: boolean;
       registrationStep: number;
       approvalStatus: ApprovalStatus;
     }

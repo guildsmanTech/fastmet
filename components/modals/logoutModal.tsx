@@ -1,8 +1,7 @@
-import { useAppStore } from "@/store/useAppStore";
+import { performLogout } from "@/lib/axios";
 import { STATIC_IMAGES } from "@/utils/constants";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import React from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 
@@ -14,10 +13,8 @@ const LogoutModal = ({
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) => {
   const handleLogout = async () => {
-    useAppStore.getState().logout();
-    useAppStore.getState().clearStates();
     setIsOpen(false);
-    router.replace("/(auth)/auth");
+    await performLogout();
   };
 
   return (
