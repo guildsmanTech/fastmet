@@ -5,6 +5,7 @@ import { useSocket } from "@/sockets/context/SocketProvider";
 import { useAppStore } from "@/store/useAppStore";
 import { ChatMessage, ChatSurface } from "@/types/chat";
 import { PickedImage, prepareChatImage } from "@/utils/helpers/imagePicker";
+import { dismissChatNotifications } from "@/utils/helpers/notifications";
 import { isAxiosError } from "axios";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
@@ -139,6 +140,7 @@ export function useChatRoom({
       }
       joined = true;
       setCanSendMessages(res.canSendMessages);
+      void dismissChatNotifications(conversationId);
 
       const page = await emitWithAck<{
         messages: ChatMessage[];

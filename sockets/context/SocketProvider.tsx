@@ -36,8 +36,12 @@ import {
 } from "../handlers/booking";
 import {forceLogout} from "../handlers/account";
 import {receiveMessage} from "../handlers/chat";
-import {notificationCreated} from "../handlers/notification";
+import {
+  notificationCreated,
+  staleNotificationCleanup,
+} from "../handlers/notification";
 import {getSocket} from "../socket";
+import {pruneStaleNotifications} from "@/utils/helpers/notifications";
 import {resyncNotifications} from "@/utils/helpers/query";
 
 const SOCKET_RETRY_MIN_MS = 2000;
@@ -86,6 +90,7 @@ export default function SocketProvider({
       socket.emit("app_state", {active: true});
       // Still connected: events may have been missed while backgrounded.
       void resyncNotifications();
+      pruneStaleNotifications();
     };
     const appStateSub = AppState.addEventListener("change", onAppState);
 
@@ -110,6 +115,8 @@ export default function SocketProvider({
       retryDelay = SOCKET_RETRY_MIN_MS;
       if (hasConnected) void resyncNotifications();
       hasConnected = true;
+      // Also on launch: bookings may have moved on while the app was closed.
+      pruneStaleNotifications();
     };
     socket.on("connect", onConnect);
 
@@ -173,6 +180,7 @@ export default function SocketProvider({
     const cleanupForceLogout = forceLogout(socket);
     const cleanupReceiveMessage = receiveMessage(socket);
     const cleanupNotificationCreated = notificationCreated(socket);
+    const cleanupStaleNotifications = staleNotificationCleanup(socket);
     const cleanupAcceptanceRequestedSchedule =
       acceptanceRequestedSchedule(socket);
     const cleanupCancelScheduleDriverOffer = cancelScheduleDriverOffer(socket);
@@ -197,6 +205,7 @@ export default function SocketProvider({
       cleanupForceLogout();
       cleanupReceiveMessage();
       cleanupNotificationCreated();
+      cleanupStaleNotifications();
       cleanupAcceptanceRequestedSchedule();
       cleanupCancelScheduleDriverOffer();
       cleanupDriverUnavailable();

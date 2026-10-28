@@ -27,7 +27,8 @@ export default {
           "We need your location to show navigation and track deliveries.",
         NSPhotoLibraryUsageDescription:
           "We need access to your photos to upload pictures.",
-        NSCameraUsageDescription: "We need camera access to take photos.",
+        NSCameraUsageDescription:
+          "FastMet uses your camera to take photos and to verify your identity with a live face scan.",
       },
     },
     android: {

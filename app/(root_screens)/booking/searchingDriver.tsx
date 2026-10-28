@@ -140,13 +140,18 @@ export default function SearchingDriver() {
         getBookingOffers(bookingId),
       ]);
 
-      if (booking.status === "active" || booking.status === "picked_up") {
+      if (
+        booking.status === "active" ||
+        booking.status === "picked_up" ||
+        booking.status === "need_continuance"
+      ) {
         exitToActiveMap(bookingId);
         return;
       }
 
+      // No clearStates() on exit: paymentMethod cleared the draft at submit,
+      // and a screen opened from a push must not wipe a newer draft.
       if (booking.status === "cancelled" || booking.status === "completed") {
-        useAppStore.getState().clearStates();
         exitToDrawer("/(drawer)/book");
         return;
       }
@@ -165,7 +170,6 @@ export default function SearchingDriver() {
       );
     } catch {
       // 404 = expired / deleted searching booking
-      useAppStore.getState().clearStates();
       Toast.show({
         type: "error",
         text1: "Request Expired",
@@ -263,7 +267,6 @@ export default function SearchingDriver() {
       useDriverLocationStore.getState().clearDriverLocationCache(bookingId);
 
       exitToDrawer("/(drawer)/(tabs)/request?tab=cancelled");
-      useAppStore.getState().clearStates();
       Toast.show({
         type: "success",
         text1: "Booking Cancelled",
@@ -391,7 +394,6 @@ export default function SearchingDriver() {
         swipeable: true,
         topOffset: 50,
       });
-      useAppStore.getState().clearStates();
       exitToDrawer("/(drawer)/book");
     };
 
@@ -419,7 +421,6 @@ export default function SearchingDriver() {
         swipeable: true,
         topOffset: 50,
       });
-      useAppStore.getState().clearStates();
       useAppStore.getState().setUnreadNotificationCount(unreadNotifications);
 
       // If notifications have been fetched before, prepend this notif in the cache

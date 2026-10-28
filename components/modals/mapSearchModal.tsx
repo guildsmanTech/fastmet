@@ -9,7 +9,11 @@ import {
   isDropOffAllowed,
   isWithinAllowedPickupBounds,
 } from "@/utils/constants";
-import { formatLocation, formatMeters } from "@/utils/helpers/location";
+import {
+  formatLocation,
+  formatMeters,
+  getFastCurrentPosition,
+} from "@/utils/helpers/location";
 import { getArray, pushToArray } from "@/utils/helpers/recentPlaceStorage";
 import * as Contacts from "expo-contacts";
 import * as Location from "expo-location";
@@ -454,9 +458,7 @@ const SearchModal: React.FC<SearchModalProps> = ({ visible, onClose, type }) => 
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const location = await getFastCurrentPosition();
       const { latitude, longitude } = location.coords;
       const geocoded = await reverseGeocode(latitude, longitude);
 

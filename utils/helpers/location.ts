@@ -1,4 +1,18 @@
 import {LocationDetails} from "@/types/book";
+import * as Location from "expo-location";
+
+/**
+ * Current device position, fast: uses the OS's cached fix when it's recent and
+ * precise enough, and only waits for a fresh fix (which can take 5–30s) otherwise.
+ */
+export const getFastCurrentPosition = async () =>
+  (await Location.getLastKnownPositionAsync({
+    maxAge: 60_000,
+    requiredAccuracy: 100,
+  })) ??
+  (await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.Balanced,
+  }));
 
 export const isSameLocation = (
   lat1: number,

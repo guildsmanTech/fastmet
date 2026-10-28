@@ -3,6 +3,7 @@ import {useAppStore} from "@/store/useAppStore";
 import {LocationDetails, RouteData} from "@/types/book";
 import {STATIC_IMAGES} from "@/utils/constants";
 import {formatDuration} from "@/utils/helpers/date";
+import {getFastCurrentPosition} from "@/utils/helpers/location";
 import {Image} from "expo-image";
 import * as Location from "expo-location";
 import {useFocusEffect} from "expo-router";
@@ -134,7 +135,7 @@ const MapScreen = forwardRef<MapScreenHandle, Props>(function MapScreen(
           return;
         }
 
-        const location = await Location.getCurrentPositionAsync({});
+        const location = await getFastCurrentPosition();
         if (!isMounted) return;
 
         const userRegion = {

@@ -1,5 +1,6 @@
 import {UserAddress} from "@/types/user";
 import {GOOGLE_MAPS_API_KEY} from "@/utils/constants";
+import {getFastCurrentPosition} from "@/utils/helpers/location";
 import {Ionicons} from "@expo/vector-icons";
 import * as Location from "expo-location";
 import React, {useCallback, useEffect, useRef, useState} from "react";
@@ -229,9 +230,7 @@ export default function AddressInput({
         return;
       }
 
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const position = await getFastCurrentPosition();
       const {latitude: lat, longitude: lng} = position.coords;
 
       const response = await fetch(
