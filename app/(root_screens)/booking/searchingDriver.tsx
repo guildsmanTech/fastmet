@@ -156,9 +156,8 @@ export default function SearchingDriver() {
         return;
       }
 
-      if (booking.status === "pending" && isPooling) {
-        setWaitingForTripStart(true);
-      }
+      // Pooling: accepted, waiting for the driver to start the trip.
+      setWaitingForTripStart(isPooling && booking.status === "pending");
 
       setTipAmount(booking.tipAmount ?? 0);
 
@@ -505,11 +504,20 @@ export default function SearchingDriver() {
 
   //SOCKETS LISTENER
   useEffect(() => {
-    const handleCancelOffer = ({driverId}: {driverId: string}) => {
+    const handleCancelOffer = ({
+      driverId,
+      bookingId: cancelledBookingId,
+    }: {
+      driverId: string;
+      bookingId?: string;
+    }) => {
+      if (cancelledBookingId && cancelledBookingId !== bookingId) return;
       setDrivers((prev) => prev.filter((driver) => driver.id !== driverId));
       if (selectedDriver?.id === driverId) setSelectedDriver(null);
 
-      setWaitingForTripStart(false); //test
+      // Only the accepted driver backing out ends the wait for the trip, so
+      // read the booking's status instead of guessing.
+      if (isPooling) void resyncBookingState();
     };
 
     const event = isPooling ? "offerCancelledPooling" : "offerCancelledAsap";
@@ -517,7 +525,7 @@ export default function SearchingDriver() {
     return () => {
       socket.off(event, handleCancelOffer);
     };
-  }, [selectedDriver?.id, socket, isPooling]);
+  }, [selectedDriver?.id, socket, isPooling, bookingId, resyncBookingState]);
 
   const handleRemoveDriver = (id: string) => {
     setDrivers((prev) => prev.filter((driver) => driver.id !== id));
