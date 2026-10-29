@@ -32,9 +32,9 @@ function AuthMetaSync() {
 Sentry.init({
   dsn: "https://aceadef3929e78209242fa356db6b552@o4510836378697728.ingest.us.sentry.io/4510836521435136",
 
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
+  // No IP address, cookies or user data in events.
+  // See https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: false,
 
   // Enable Logs
   enableLogs: true,

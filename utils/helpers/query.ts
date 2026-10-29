@@ -62,6 +62,17 @@ export const updateNotificationHelper = (
 };
 
 /**
+ * Refreshes booking caches after a reconnect or return to foreground: booking
+ * events may have been missed. Only screens on display refetch now; the rest
+ * refetch when they mount.
+ */
+export const resyncBookings = () => {
+  void queryClient.invalidateQueries({ queryKey: ["userBookings"] });
+  void queryClient.invalidateQueries({ queryKey: ["userBooking"] });
+  void queryClient.invalidateQueries({ queryKey: ["userBookingCounts"] });
+};
+
+/**
  * Re-reads the unread count after a reconnect or return to foreground
  * (socket events may have been missed); refreshes the list only when the
  * count changed.

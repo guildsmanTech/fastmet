@@ -1,7 +1,7 @@
 import {useCancelBookingTimer} from "@/hooks/useCancelBookingTimer";
 import {useSocket} from "@/sockets/context/SocketProvider";
 import {Ionicons} from "@expo/vector-icons";
-import React, {useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 import {ActivityIndicator, Alert, Pressable, Text, View} from "react-native";
 import Toast from "react-native-toast-message";
 
@@ -23,11 +23,67 @@ export default function CancelBookingButton({
 }: CancelBookingButtonProps) {
   const [isCancelling, setIsCancelling] = useState(false);
   const socket = useSocket();
+  // Tears down the in-flight request's listeners and timeout.
+  const stopRequestRef = useRef<(() => void) | null>(null);
 
   const {canCancel, remainingMinutes, remainingSeconds} = useCancelBookingTimer(
     referenceTime,
     graceMinutes,
   );
+
+  // Unmounted mid-request (list refreshed, screen left): drop the listeners.
+  useEffect(() => () => stopRequestRef.current?.(), []);
+
+  const requestCancel = () => {
+    if (stopRequestRef.current) return;
+    setIsCancelling(true);
+
+    const handleSuccess = (payload?: {bookingId?: string}) => {
+      // The customer's room gets every booking's cancellation.
+      if (String(payload?.bookingId) !== String(bookingId)) return;
+      stopRequest();
+
+      Toast.show({
+        type: "success",
+        text1: "Booking Cancelled",
+        text2:
+          "You can report the driver as a no-show through the Customer Support page.",
+        position: "top",
+        topOffset: 50,
+      });
+
+      onCancelled?.();
+    };
+
+    // The server's `error` carries no booking id; while this request is in
+    // flight it is the answer to it.
+    const handleError = (error?: {text1?: string; text2?: string}) => {
+      stopRequest();
+      setIsCancelling(false);
+      Alert.alert(
+        error?.text1 || "Cannot cancel",
+        error?.text2 || "Please try again",
+      );
+    };
+
+    const timeout = setTimeout(() => {
+      stopRequest();
+      setIsCancelling(false);
+      Alert.alert("Request timeout", "Please check your connection");
+    }, 10000);
+
+    const stopRequest = () => {
+      clearTimeout(timeout);
+      socket.off("bookingCancelled", handleSuccess);
+      socket.off("error", handleError);
+      stopRequestRef.current = null;
+    };
+    stopRequestRef.current = stopRequest;
+
+    socket.on("bookingCancelled", handleSuccess);
+    socket.on("error", handleError);
+    socket.emit("cancelBookingRequest", {bookingId});
+  };
 
   const handleCancel = () => {
     Alert.alert(
@@ -38,51 +94,7 @@ export default function CancelBookingButton({
         {
           text: "Yes, Cancel",
           style: "destructive",
-          onPress: async () => {
-            setIsCancelling(true);
-
-            // Listen for success/error
-            const handleSuccess = () => {
-              socket.off("bookingCancelled", handleSuccess);
-              socket.off("error", handleError);
-
-              Toast.show({
-                type: "success",
-                text1: "Booking Cancelled",
-                text2:
-                  "You can report the driver as a no-show through the Customer Support page.",
-                position: "top",
-                topOffset: 50,
-              });
-
-              onCancelled?.();
-            };
-
-            const handleError = (error: {text1: string; text2?: string}) => {
-              socket.off("bookingCancelled", handleSuccess);
-              socket.off("error", handleError);
-
-              setIsCancelling(false);
-              Alert.alert(error.text1, error.text2 || "Please try again");
-            };
-
-            socket.once("bookingCancelled", handleSuccess);
-            socket.once("error", handleError);
-
-            socket.emit("cancelBookingRequest", {
-              bookingId,
-            });
-
-            // Timeout fallback
-            setTimeout(() => {
-              socket.off("bookingCancelled", handleSuccess);
-              socket.off("error", handleError);
-              if (isCancelling) {
-                setIsCancelling(false);
-                Alert.alert("Request timeout", "Please check your connection");
-              }
-            }, 10000);
-          },
+          onPress: requestCancel,
         },
       ],
     );

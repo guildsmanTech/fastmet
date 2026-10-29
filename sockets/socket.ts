@@ -10,11 +10,6 @@ let currentToken: string | null = null;
 export const getSocket = (token: string) => {
   // Only recreate if token changed or socket doesn't exist
   if (!socket || currentToken !== token) {
-    console.log(
-      "🔄 Creating new socket with token:",
-      token.substring(0, 20) + "..."
-    );
-
     // Disconnect old socket
     if (socket) {
       socket.disconnect();

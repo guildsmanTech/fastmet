@@ -127,8 +127,6 @@ export const driverUnavailable = (socket: Socket) => {
     notification?: Notification | null;
     unreadNotifications?: number;
   }) => {
-    console.log("🔔 Driver unavailable:", bookingId, driverId);
-
     // Remove from scheduled and capture the booking in a single pass
     let bookingToRestore: Booking | null = null;
 
@@ -316,8 +314,8 @@ export const scheduledReminder = (socket: Socket) => {
         exact: false,
       });
       queryClient.invalidateQueries({queryKey: ["userBookingCounts"]});
-      // bookingCancelled already toasts; skip a second toast here.
-      return;
+      // Falls through to the toast: the `bookingCancelled` that follows only
+      // refreshes caches, it doesn't say why.
     }
 
     Toast.show({
@@ -457,6 +455,62 @@ export const bookingCompleted = (socket: Socket) => {
   socket.on("bookingCompleted", handleBookingCompleted);
   return () => {
     socket.off("bookingCompleted", handleBookingCompleted);
+  };
+};
+
+/**
+ * One of this customer's bookings was cancelled, by them, the driver, an admin
+ * or the system. Refreshes every booking cache; screens showing the booking
+ * (live map, lists) react to the refreshed status. The screen that asked for
+ * the cancel shows its own confirmation.
+ */
+export const bookingCancelled = (socket: Socket) => {
+  const syncCancelled = (bookingId?: string) => {
+    if (bookingId) {
+      useAppStore.getState().clearLiveEtaCache(bookingId);
+      useDriverLocationStore.getState().clearDriverLocationCache(bookingId);
+    }
+
+    queryClient.invalidateQueries({
+      queryKey: bookingId ? ["userBooking", bookingId] : ["userBooking"],
+    });
+    queryClient.invalidateQueries({queryKey: ["userBookings"]});
+    queryClient.invalidateQueries({queryKey: ["userBookingCounts"]});
+    // A voucher on the booking may have been released.
+    queryClient.invalidateQueries({queryKey: ["rewards"], exact: false});
+  };
+
+  const handleCancelled = (payload?: {bookingId?: string}) => {
+    syncCancelled(payload?.bookingId);
+  };
+
+  const handleCancelledByDriver = (payload?: {
+    bookingId?: string;
+    reason?: string;
+    message?: string;
+  }) => {
+    syncCancelled(payload?.bookingId);
+
+    Toast.show({
+      type: "info",
+      text1: "Booking Cancelled",
+      text2:
+        payload?.reason === "no_show_client"
+          ? "Driver reported you as no-show"
+          : payload?.reason === "driver_unavailable"
+            ? "Your driver is no longer available. Please book again."
+            : payload?.message || "Driver cancelled the booking",
+      position: "top",
+      topOffset: 50,
+      visibilityTime: 5000,
+    });
+  };
+
+  socket.on("bookingCancelled", handleCancelled);
+  socket.on("bookingCancelledByDriver", handleCancelledByDriver);
+  return () => {
+    socket.off("bookingCancelled", handleCancelled);
+    socket.off("bookingCancelledByDriver", handleCancelledByDriver);
   };
 };
 

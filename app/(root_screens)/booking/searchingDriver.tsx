@@ -106,6 +106,8 @@ export default function SearchingDriver() {
   const [selectedDriver, setSelectedDriver] = useState<RequestedDriver | null>(
     null,
   );
+  // The customer tapped Cancel Request here, so a cancel is their own.
+  const cancelRequestedRef = useRef(false);
   // Read by the socket error handler without re-subscribing on every select
   const selectedDriverRef = useRef(selectedDriver);
   useEffect(() => {
@@ -129,8 +131,6 @@ export default function SearchingDriver() {
   useEffect(() => {
     if (!canEditTip) setTipSheetOpen(false);
   }, [canEditTip]);
-
-  console.log("SearchingDriver");
 
   const resyncBookingState = useCallback(async () => {
     if (!bookingId) return;
@@ -261,15 +261,36 @@ export default function SearchingDriver() {
 
   //SOCKETS LISTENER
   useEffect(() => {
-    const handleBookingCancelled = ({bookingId}: {bookingId: string}) => {
+    // These events go to the customer's room, so they can be about another of
+    // their bookings (e.g. a scheduled one auto-cancelled). Without an id,
+    // ask the server where this booking stands.
+    const isThisBooking = (eventBookingId?: string) => {
+      if (!eventBookingId) {
+        void resyncBookingState();
+        return false;
+      }
+      return String(eventBookingId) === String(bookingId);
+    };
+
+    const handleBookingCancelled = ({
+      bookingId: cancelledId,
+      notification,
+    }: {
+      bookingId?: string;
+      notification?: Notification | null;
+    } = {}) => {
+      if (!isThisBooking(cancelledId)) return;
+
       // Clear driver location cache for this booking
       useDriverLocationStore.getState().clearDriverLocationCache(bookingId);
 
       exitToDrawer("/(drawer)/(tabs)/request?tab=cancelled");
       Toast.show({
-        type: "success",
+        type: cancelRequestedRef.current ? "success" : "info",
         text1: "Booking Cancelled",
-        text2: "Successfully cancelled booking",
+        text2: cancelRequestedRef.current
+          ? "Successfully cancelled booking"
+          : notification?.message || "This booking was cancelled.",
         position: "top",
         visibilityTime: 5_000,
         swipeable: true,
@@ -397,14 +418,18 @@ export default function SearchingDriver() {
     };
 
     const handleBookingExpired = ({
+      bookingId: expiredId,
       message,
       notification,
       unreadNotifications,
     }: {
+      bookingId?: string;
       message: string;
       notification: Notification;
       unreadNotifications: number;
     }) => {
+      if (!isThisBooking(expiredId)) return;
+
       // Invalidate voucher queries (voucher may have been released)
       queryClient.invalidateQueries({
         queryKey: ["rewards"],
@@ -480,7 +505,14 @@ export default function SearchingDriver() {
       socket.off("error", errorHandler);
       socket.off("bookingExpired", handleBookingExpired);
     };
-  }, [socket, isPooling, bookingId, exitToActiveMap, exitToDrawer]);
+  }, [
+    socket,
+    isPooling,
+    bookingId,
+    exitToActiveMap,
+    exitToDrawer,
+    resyncBookingState,
+  ]);
 
   // Driver offers listener — ASAP vs pooling use different events but same data shape
   useEffect(() => {
@@ -540,21 +572,17 @@ export default function SearchingDriver() {
         {
           text: "No",
           style: "cancel",
-          onPress: () => console.log("Alert cancelled"),
         },
         {
           text: "Yes",
           style: "destructive",
           onPress: () => {
-            console.log("Confirming cancellation");
+            cancelRequestedRef.current = true;
             socket.emit("cancelBookingRequest", {bookingId});
           },
         },
       ],
-      {
-        cancelable: true,
-        onDismiss: () => console.log("Alert dismissed"),
-      },
+      {cancelable: true},
     );
   };
 
@@ -831,7 +859,6 @@ const DriverRow = memo(
     isPaused: boolean;
     showAvailability: boolean;
   }) => {
-    console.log("DriverRow");
     const translateX = useRef(new Animated.Value(-400)).current;
     const opacity = useRef(new Animated.Value(0)).current;
     const progressAnim = useRef(new Animated.Value(100)).current;

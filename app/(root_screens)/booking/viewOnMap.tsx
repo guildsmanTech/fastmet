@@ -39,7 +39,10 @@ export default function ViewOnMap() {
   const [region, setRegion] = useState<Region | null>(null);
   // Unmount the live map before navigating — replace while MapView is mounted
   // is unreliable and can leave this screen stuck until the user presses back.
-  const [leavingToCompleted, setLeavingToCompleted] = useState(false);
+  // The Request tab to land on once the trip has ended.
+  const [leavingTo, setLeavingTo] = useState<"completed" | "cancelled" | null>(
+    null,
+  );
   const hasNavigatedRef = useRef(false);
 
   const params = useLocalSearchParams<{
@@ -112,27 +115,31 @@ export default function ViewOnMap() {
     };
   }, [socket, activeConversationId]);
 
-  const leaveToCompleted = useCallback(() => {
+  const leaveTo = useCallback((tab: "completed" | "cancelled") => {
     if (hasNavigatedRef.current) return;
     hasNavigatedRef.current = true;
     // Drop MapView from the tree first; navigation runs in the effect below.
-    setLeavingToCompleted(true);
+    setLeavingTo(tab);
   }, []);
 
-  // After MapView unmounts, land on the completed tab.
+  // After MapView unmounts, land on the matching Request tab.
   useEffect(() => {
-    if (!leavingToCompleted) return;
+    if (!leavingTo) return;
 
     const task = InteractionManager.runAfterInteractions(() => {
-      router.dismissTo("/(drawer)/(tabs)/request?tab=completed");
+      router.dismissTo(
+        leavingTo === "completed"
+          ? "/(drawer)/(tabs)/request?tab=completed"
+          : "/(drawer)/(tabs)/request?tab=cancelled",
+      );
     });
 
     return () => task.cancel();
-  }, [leavingToCompleted]);
+  }, [leavingTo]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!socket || !bookingId || leavingToCompleted) return;
+      if (!socket || !bookingId || leavingTo) return;
 
       const handleBookingCompleted = ({
         bookingId: completedId,
@@ -140,24 +147,27 @@ export default function ViewOnMap() {
         bookingId: string;
       }) => {
         if (String(completedId) !== String(bookingId)) return;
-        leaveToCompleted();
+        leaveTo("completed");
       };
 
       socket.on("bookingCompleted", handleBookingCompleted);
       return () => {
         socket.off("bookingCompleted", handleBookingCompleted);
       };
-    }, [bookingId, socket, leaveToCompleted, leavingToCompleted]),
+    }, [bookingId, socket, leaveTo, leavingTo]),
   );
 
-  // Query fallback — global socket handler invalidates this booking; if status
-  // lands on completed (e.g. focus/listener edge cases), still leave the map.
+  // Query fallback — the global socket handlers invalidate this booking on
+  // completion and on any cancellation (driver, admin, system), so the
+  // refetched status closes the map.
   useEffect(() => {
-    if (leavingToCompleted) return;
+    if (leavingTo) return;
     if (booking?.status === "completed") {
-      leaveToCompleted();
+      leaveTo("completed");
+    } else if (booking?.status === "cancelled") {
+      leaveTo("cancelled");
     }
-  }, [booking?.status, leaveToCompleted, leavingToCompleted]);
+  }, [booking?.status, leaveTo, leavingTo]);
 
   // Opened from the Request tab (shouldGoBack): pop back to it. Otherwise this
   // replaced the booking flow, so go to the Active tab instead.
@@ -179,7 +189,7 @@ export default function ViewOnMap() {
     }, [handleBack]),
   );
 
-  if (leavingToCompleted) {
+  if (leavingTo) {
     return (
       <View className="flex-1 justify-center items-center bg-white">
         <ActivityIndicator size="large" color="#FFA840" />

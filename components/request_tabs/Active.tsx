@@ -7,7 +7,6 @@ import {
   clearConversationUnreadInCache,
   useConversations,
 } from "@/queries/conversation";
-import { useSocket } from "@/sockets/context/SocketProvider";
 import { useAppStore } from "@/store/useAppStore";
 import { ActiveBooking, Driver } from "@/types/book";
 import { createConversationId } from "@/utils/helpers/booking";
@@ -17,7 +16,7 @@ import { pushOnce } from "@/utils/helpers/navigation";
 import { openChat as openChatScreen } from "@/utils/helpers/openChat";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,7 +27,6 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-toast-message";
 import DriverProfileSheet from "../modals/DriverProfileSheet";
 import SeeMoreModalDisplay from "../modals/seeMoreModalDisplay";
 import StarDisplay from "../StarDisplay";
@@ -37,7 +35,6 @@ export default function ActiveRoute() {
   const { modalVisible, setModalVisible, selectedRequest, handleSeeMorePress } =
     useSeeMoreDetails<ActiveBooking>();
   const [profileDriver, setProfileDriver] = useState<Driver | null>(null);
-  const socket = useSocket();
 
   const {
     data,
@@ -60,65 +57,6 @@ export default function ActiveRoute() {
     }
     return map;
   }, [conversationsData]);
-
-  // Listen for booking cancellation events
-  useEffect(() => {
-    const handleBookingCancelledByDriver = ({
-      bookingId,
-      reason,
-    }: {
-      bookingId: string;
-      reason: string;
-    }) => {
-      Toast.show({
-        type: "info",
-        text1: "Booking Cancelled",
-        text2:
-          reason === "no_show_client"
-            ? "Driver reported you as no-show"
-            : reason === "driver_unavailable"
-              ? "Your driver is no longer available. Please book again."
-              : "Driver cancelled the booking",
-        position: "top",
-        topOffset: 50,
-        visibilityTime: 5000,
-      });
-      refetch();
-    };
-
-    const handlePoolingBookingCancelled = ({
-      cancelledBookingId,
-    }: {
-      tripId: string;
-      stops: any[];
-      currentStopIndex: number;
-      cancelledBookingId: string;
-    }) => {
-      // Check if it's our booking
-      const myBooking = activeBookings.find(
-        (b) => b._id === cancelledBookingId,
-      );
-      if (myBooking) {
-        Toast.show({
-          type: "info",
-          text1: "Booking Cancelled",
-          text2: "Your stop in the pooling trip was cancelled",
-          position: "top",
-          topOffset: 50,
-        });
-        refetch();
-      }
-    };
-
-    socket.on("bookingCancelledByDriver", handleBookingCancelledByDriver);
-    socket.on("poolingBookingCancelled", handlePoolingBookingCancelled);
-
-    return () => {
-      socket.off("bookingCancelledByDriver", handleBookingCancelledByDriver);
-      socket.off("poolingBookingCancelled", handlePoolingBookingCancelled);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, refetch]);
 
   if (isPending)
     return (

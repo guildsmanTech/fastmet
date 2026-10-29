@@ -373,7 +373,6 @@ export default function SeeMoreModalDisplay({
             <Pressable
               className="flex-row gap-2 justify-center items-center py-3 mx-4 rounded-lg bg-lightPrimary active:bg-darkPrimary"
               onPress={() => {
-                console.log(data._id);
                 onClose();
                 router.push({
                   pathname: "/(root_screens)/booking/viewOnMap",

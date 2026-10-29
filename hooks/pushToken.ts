@@ -50,7 +50,6 @@ export async function getExpoPushToken() {
     }
 
     const token = (await Notifications.getExpoPushTokenAsync({projectId})).data;
-    console.log("📱 Push token obtained:", token);
     return token;
   } catch (error) {
     console.error("❌ getExpoPushToken failed:", error);
@@ -97,7 +96,6 @@ export async function savePushTokenToBackend(token: string) {
 
     const saved = await getPushRegistration();
     if (saved?.token === token && saved?.userId === userId) {
-      console.log("✅ Push token already saved (no update needed)");
       return true;
     }
 
@@ -106,7 +104,6 @@ export async function savePushTokenToBackend(token: string) {
     });
 
     if (response.data.success) {
-      console.log("✅ Push token saved to backend");
       await setItemAsync(
         PUSH_REGISTRATION_KEY,
         JSON.stringify({token, userId}),

@@ -107,7 +107,6 @@ export const receiveMessage = (socket: Socket) => {
   const unreadConversationsUpdatedHandler = (data: {
     unreadConversationsCount: number;
   }) => {
-    console.log("🔔 Unread conversations updated:", data);
     useAppStore
       .getState()
       .setUnreadConversationsCount(data.unreadConversationsCount);

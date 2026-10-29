@@ -4,13 +4,12 @@ import {useRescheduleBookingMutation} from "@/mutations/booking";
 import {useUserBookings} from "@/queries/bookingQueries";
 import {useSocket} from "@/sockets/context/SocketProvider";
 import {useAppStore} from "@/store/useAppStore";
-import {useDriverLocationStore} from "@/store/useDriverLocationStore";
 import {Booking, Driver, LocationDetails, RequestedDriver} from "@/types/book";
 import {formatDate} from "@/utils/helpers/date";
 import {formatLocation} from "@/utils/helpers/location";
 import {Ionicons} from "@expo/vector-icons";
 import {Image} from "expo-image";
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -126,21 +125,57 @@ export default function RequestRoute() {
     }
   };
 
-  const handleCancelBook = () => {
+  // A cancel or accept from this tab shows the full-screen loading modal until
+  // the server answers. Every outcome must end it, or the app is stuck.
+  const awaitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The booking this tab asked to cancel; only that cancel gets its toast.
+  const cancelRequestedIdRef = useRef<string | null>(null);
+
+  const finishAwait = useCallback(() => {
+    if (!awaitTimeoutRef.current) return false;
+    clearTimeout(awaitTimeoutRef.current);
+    awaitTimeoutRef.current = null;
+    cancelRequestedIdRef.current = null;
+    setLoading(false);
+    return true;
+  }, [setLoading]);
+
+  const startAwait = useCallback(() => {
+    if (awaitTimeoutRef.current) clearTimeout(awaitTimeoutRef.current);
     setLoading(true);
+    awaitTimeoutRef.current = setTimeout(() => {
+      if (!finishAwait()) return;
+      Toast.show({
+        type: "error",
+        text1: "Request Timeout",
+        text2: "Server not responding. Please try again.",
+        position: "top",
+        visibilityTime: 4000,
+        topOffset: 50,
+      });
+    }, 15000);
+  }, [finishAwait, setLoading]);
+
+  // Left mid-request: don't leave the loading modal up.
+  useEffect(() => () => void finishAwait(), [finishAwait]);
+
+  const handleCancelBook = () => {
+    if (!selectedId) return;
+    startAwait();
+    cancelRequestedIdRef.current = selectedId;
     socket.emit("cancelBookingRequest", {bookingId: selectedId});
     setSelectedId(null);
   };
 
   const acceptDriver = useCallback(() => {
     if (!selectedDriver?.id || !selectedDriver?.bookingId) return;
-    setLoading(true);
+    startAwait();
     socket.emit("acceptDriver", {
       driverId: selectedDriver.id,
       bookingId: selectedDriver.bookingId,
       type: "schedule",
     });
-  }, [selectedDriver?.bookingId, selectedDriver?.id, setLoading, socket]);
+  }, [selectedDriver?.bookingId, selectedDriver?.id, startAwait, socket]);
 
   const rejectDriver = useCallback(() => {
     if (!selectedDriver?.id || !selectedDriver?.bookingId) return;
@@ -188,36 +223,11 @@ export default function RequestRoute() {
   }, []);
 
   useEffect(() => {
-    const bookingCancelled = (bookingId: string) => {
-      setLoading(false);
-
-      // Clear driver location cache for this booking
-      useDriverLocationStore.getState().clearDriverLocationCache(bookingId);
-
-      queryClient.invalidateQueries({
-        queryKey: ["userBookings", "pending"],
-        exact: false,
-      });
-
-      queryClient.invalidateQueries({
-        queryKey: ["userBookings", "scheduled"],
-        exact: false,
-      });
-
-      queryClient.invalidateQueries({
-        queryKey: ["userBookings", "cancelled"],
-        exact: false,
-      });
-
-      queryClient.invalidateQueries({
-        queryKey: ["userBookingCounts"],
-      });
-
-      // Invalidate voucher queries (voucher may have been released)
-      queryClient.invalidateQueries({
-        queryKey: ["rewards"],
-        exact: false,
-      });
+    // Caches are refreshed by the global `bookingCancelled` handler; this only
+    // confirms the cancel this tab asked for (not system or admin cancels).
+    const bookingCancelled = ({bookingId}: {bookingId?: string} = {}) => {
+      if (!bookingId || bookingId !== cancelRequestedIdRef.current) return;
+      finishAwait();
 
       Toast.show({
         type: "success",
@@ -237,7 +247,11 @@ export default function RequestRoute() {
       text1?: string;
       text2?: string;
       message?: string;
-    }) => {
+    } = {}) => {
+      // The server's `error` carries no booking id; while this tab waits on
+      // a cancel or accept, it is the answer to it.
+      finishAwait();
+
       Toast.show({
         type: "error",
         text1: text1 || "Error",
@@ -254,7 +268,7 @@ export default function RequestRoute() {
       socket.off("bookingCancelled", bookingCancelled);
       socket.off("error", errorHandler);
     };
-  }, [setLoading, socket]);
+  }, [finishAwait, socket]);
 
   useEffect(() => {
     const driverAcceptedSchedule = ({
@@ -266,7 +280,7 @@ export default function RequestRoute() {
     }) => {
       if (bookingId !== selectedDriver?.bookingId) return;
 
-      setLoading(false);
+      finishAwait();
       closeDriversModal();
       queryClient.invalidateQueries({
         queryKey: ["userBookings", "scheduled"],
@@ -296,9 +310,9 @@ export default function RequestRoute() {
     };
   }, [
     closeDriversModal,
+    finishAwait,
     selectedDriver?.bookingId,
     selectedDriver?.name,
-    setLoading,
     socket,
   ]);
 

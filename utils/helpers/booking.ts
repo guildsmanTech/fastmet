@@ -36,7 +36,6 @@ export const generateBookingRef = ({
 };
 
 export const createConversationId = (id1: string, id2: string): string => {
-  console.log([id1, id2].sort().join("_"));
   return [id1, id2].sort().join("_");
 };
 

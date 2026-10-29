@@ -8,11 +8,22 @@ import { Alert, Linking } from "react-native";
 
 export const openGallery = async () => {
   // Android Photo Picker — no READ_MEDIA_* / storage permission needed
-  return ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ["images"],
-    allowsEditing: false,
-    quality: 1,
-  });
+  // The picker copies the photo into the cache; this rejects when that copy
+  // fails (low storage, unreadable or cloud-only file).
+  try {
+    return await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 1,
+    });
+  } catch (error) {
+    console.error("Gallery pick failed:", error);
+    Alert.alert(
+      "Couldn't load photo",
+      "Try another photo, or free up some storage on your phone.",
+    );
+    return null;
+  }
 };
 
 export type PickedImage = { uri: string; width: number; height: number };
@@ -46,17 +57,26 @@ export const takePhotoAsset = async (): Promise<PickedImage | null> => {
   }
 
   // Take the photo
-  const result = await ImagePicker.launchCameraAsync({
-    allowsEditing: false,
-    quality: 1,
-  });
+  try {
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      quality: 1,
+    });
 
-  if (result.canceled || !result.assets || result.assets.length === 0) {
+    if (result.canceled || !result.assets || result.assets.length === 0) {
+      return null;
+    }
+
+    const { uri, width, height } = result.assets[0];
+    return { uri, width, height };
+  } catch (error) {
+    console.error("Camera failed:", error);
+    Alert.alert(
+      "Couldn't take photo",
+      "Try again, or free up some storage on your phone.",
+    );
     return null;
   }
-
-  const { uri, width, height } = result.assets[0];
-  return { uri, width, height };
 };
 
 export const takePhoto = async (): Promise<string | null> =>
@@ -69,7 +89,7 @@ export const pickChatImage = async (
   if (source === "camera") return takePhotoAsset();
 
   const result = await openGallery();
-  if (result.canceled || !result.assets?.[0]) return null;
+  if (!result || result.canceled || !result.assets?.[0]) return null;
   const { uri, width, height } = result.assets[0];
   return { uri, width, height };
 };

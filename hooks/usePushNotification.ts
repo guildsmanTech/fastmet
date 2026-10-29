@@ -88,13 +88,11 @@ export function usePushNotifications() {
     notificationListener.current =
       Notifications.addNotificationReceivedListener((notification) => {
         setNotification(notification);
-        console.log("📬 Notification received:", notification);
       });
 
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data;
-        console.log("👆 Notification tapped:", data);
         handleNotificationEntry(data);
       });
 

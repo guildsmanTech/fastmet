@@ -21,6 +21,7 @@ import {AppState} from "react-native";
 import {Socket} from "socket.io-client";
 import {
   acceptanceRequestedSchedule,
+  bookingCancelled,
   bookingCompleted,
   bookingDriverReassigned,
   bookingNeedsContinuance,
@@ -42,7 +43,7 @@ import {
 } from "../handlers/notification";
 import {getSocket} from "../socket";
 import {pruneStaleNotifications} from "@/utils/helpers/notifications";
-import {resyncNotifications} from "@/utils/helpers/query";
+import {resyncBookings, resyncNotifications} from "@/utils/helpers/query";
 
 const SOCKET_RETRY_MIN_MS = 2000;
 const SOCKET_RETRY_MAX_MS = 30000;
@@ -90,6 +91,7 @@ export default function SocketProvider({
       socket.emit("app_state", {active: true});
       // Still connected: events may have been missed while backgrounded.
       void resyncNotifications();
+      resyncBookings();
       pruneStaleNotifications();
     };
     const appStateSub = AppState.addEventListener("change", onAppState);
@@ -113,7 +115,10 @@ export default function SocketProvider({
     let hasConnected = socket.connected;
     const onConnect = () => {
       retryDelay = SOCKET_RETRY_MIN_MS;
-      if (hasConnected) void resyncNotifications();
+      if (hasConnected) {
+        void resyncNotifications();
+        resyncBookings();
+      }
       hasConnected = true;
       // Also on launch: bookings may have moved on while the app was closed.
       pruneStaleNotifications();
@@ -190,6 +195,7 @@ export default function SocketProvider({
     const cleanupDriverArrivedAtPickup = driverArrivedAtPickup(socket);
     const cleanupDriverArrivedAtDropoff = driverArrivedAtDropoff(socket);
     const cleanupBookingCompleted = bookingCompleted(socket);
+    const cleanupBookingCancelled = bookingCancelled(socket);
     const cleanupNeedsContinuance = bookingNeedsContinuance(socket);
     const cleanupDriverReassigned = bookingDriverReassigned(socket);
     const cleanupContinuanceCancelled = continuanceCancelledClient(socket);
@@ -214,6 +220,7 @@ export default function SocketProvider({
       cleanupDriverArrivedAtPickup();
       cleanupDriverArrivedAtDropoff();
       cleanupBookingCompleted();
+      cleanupBookingCancelled();
       cleanupNeedsContinuance();
       cleanupDriverReassigned();
       cleanupContinuanceCancelled();
