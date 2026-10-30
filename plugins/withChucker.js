@@ -35,14 +35,21 @@ const withChuckerInterceptor = (config) =>
       `super.onCreate()
     ${MARKER}
     val chuckerContext = applicationContext
+    val chucker = com.chuckerteam.chucker.api.ChuckerInterceptor.Builder(chuckerContext).build()
     com.facebook.react.modules.network.OkHttpClientProvider.setOkHttpClientFactory(
       object : com.facebook.react.modules.network.OkHttpClientFactory {
         override fun createNewNetworkModuleClient(): okhttp3.OkHttpClient =
           com.facebook.react.modules.network.OkHttpClientProvider
             .createClientBuilder(chuckerContext)
-            .addInterceptor(
-              com.chuckerteam.chucker.api.ChuckerInterceptor.Builder(chuckerContext).build()
-            )
+            .addInterceptor(okhttp3.Interceptor { chain ->
+              // Chucker reads the body to log it, but RN's multipart file parts
+              // are one-shot streams, so the real upload would go out empty.
+              if (chain.request().body?.contentType()?.type == "multipart") {
+                chain.proceed(chain.request())
+              } else {
+                chucker.intercept(chain)
+              }
+            })
             .build()
       }
     )`,
